@@ -14,4 +14,24 @@ Every major capability must be:
 
 ## Current status
 
-Batch 0 — Environment initialization.
+Batch 1 — Domain model and synthetic network fixtures.
+
+## Planned High-Level Deterministic Pipeline
+
+```
+PathwayDataset [IMPLEMENTED]
+      ↓
+Relationship Qualification [PLANNED]
+      ↓
+Path Generation [PLANNED]
+      ↓
+Path Rejection [PLANNED]
+      ↓
+Path Scoring [PLANNED]
+      ↓
+Target Person Selection [PLANNED]
+      ↓
+Explanation / Recommended Action [PLANNED]
+      ↓
+Outcome / Founder Feedback [PLANNED]
+```
