@@ -2,11 +2,13 @@
  * Arcstone Pathway Intelligence Domain Types
  *
  * Batch 1 — Domain Model and Dataset Contract
+ * Batch 2 — Deterministic Relationship Qualification
  *
  * Core Principle:
  * DATA -> EVIDENCE -> DECISION -> ACTION -> OUTCOME -> LEARNING
  *
- * This layer represents raw facts and observed evidence only.
+ * This layer represents raw facts, observed evidence, and deterministic
+ * relationship introduction-qualification decisions.
  * It does NOT score relationships, assess warmth, or generate paths.
  */
 
@@ -204,4 +206,58 @@ export interface PathwayAnalysisResult {
   recommendedPathId?: string;
   coldOutreachRequired: boolean;
   explanation?: string;
+}
+
+// ============================================================================
+// RELATIONSHIP QUALIFICATION (Batch 2)
+// ============================================================================
+
+export type RelationshipClass =
+  | "structural"
+  | "interpersonal"
+  | "network_signal";
+
+export type QualificationStatus =
+  | "eligible"
+  | "confirmation_required"
+  | "ineligible"
+  | "structural";
+
+export type RecencyBucket = "recent" | "aging" | "stale" | "unknown";
+
+export type EvidenceCategory =
+  | "direct_interaction"
+  | "founder_asserted"
+  | "public_context"
+  | "platform_signal";
+
+export interface EvidenceSummary {
+  total: number;
+  directInteraction: number;
+  founderAsserted: number;
+  publicContext: number;
+  platformSignal: number;
+}
+
+export type QualificationReasonCode =
+  | "STRUCTURAL_RELATIONSHIP"
+  | "RECENT_DIRECT_INTERACTION"
+  | "RECENT_INTERNAL_EVIDENCE"
+  | "LINKEDIN_ONLY"
+  | "PUBLIC_CONTEXT_ONLY"
+  | "NETWORK_SIGNAL_ONLY"
+  | "NO_DIRECT_INTERACTION"
+  | "STALE_INTERACTION"
+  | "AGING_INTERACTION"
+  | "NO_EVIDENCE";
+
+export interface RelationshipQualification {
+  relationshipId: string;
+  relationshipClass: RelationshipClass;
+  status: QualificationStatus;
+  recency: RecencyBucket;
+  latestRelevantInteractionAt?: string;
+  evidenceSummary: EvidenceSummary;
+  reasonCodes: QualificationReasonCode[];
+  explanation: string;
 }

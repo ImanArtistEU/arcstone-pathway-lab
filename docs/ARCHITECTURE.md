@@ -12,15 +12,21 @@ Every major capability must be:
 3. based on explicit evidence,
 4. validated before product integration.
 
+## Core Invariant
+
+$$\mathbf{NETWORK\ VISIBILITY} \neq \mathbf{INTRODUCTION\ CREDIBILITY}$$
+
+A weak tie or social graph connection may establish proximity, but Arcstone requires verifiable interaction or corroborated evidence before considering a relationship credible for a fundraising introduction.
+
 ## Current status
 
-Batch 1 — Domain model and synthetic network fixtures.
+Batch 2 — Deterministic Relationship Qualification Engine operational.
 
 ## Graph Semantics
 
 * **Observed Semantic Facts**: Relationships store empirical facts rather than assumptions. `Relationship.from` and `Relationship.to` encode semantic direction (e.g., Advisor $\rightarrow$ Advised Person).
 * **Direction vs. Traversal Permission**: Semantic edge direction is distinct from graph traversal permission. The fact that Marcus advises Elena does not prevent Elena from reaching Marcus; traversal rules are governed by downstream engines.
-* **Relationship Qualification**: Future deterministic rules evaluate relationship usability, freshness, and evidence weight.
+* **Relationship Qualification**: Evaluates introduction usability deterministically, distinguishing structural roles, verified interpersonal relationships, and raw network signals.
 * **Path Generation**: Future path search determines valid traversals from founder to candidate target investors.
 * **Referential Consistency**: Relationships and evidence are strictly bound with bidirectional referential integrity, preventing dangling or misattributed citations.
 
@@ -37,7 +43,7 @@ GitHub Actions CI (`.github/workflows/ci.yml`) independently validates every com
 ```
 PathwayDataset [IMPLEMENTED]
       ↓
-Relationship Qualification [PLANNED]
+Relationship Qualification [IMPLEMENTED]
       ↓
 Path Generation [PLANNED]
       ↓

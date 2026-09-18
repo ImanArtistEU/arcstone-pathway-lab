@@ -178,7 +178,11 @@ export const pathwayDemoDataset: PathwayDataset = {
       to: { type: "person", id: "person-vc-sarah" },
       type: "co_invested",
       direction: "bidirectional",
-      evidenceIds: ["ev-marcus-sarah-press", "ev-marcus-sarah-board"],
+      evidenceIds: [
+        "ev-marcus-sarah-press",
+        "ev-marcus-sarah-board",
+        "ev-marcus-sarah-email",
+      ],
       startedAt: "2021-06-01",
       lastObservedAt: "2026-08-15",
     },
@@ -324,6 +328,14 @@ export const pathwayDemoDataset: PathwayDataset = {
       observedAt: "2026-08-15",
       sourceUrl: "https://datafleet-example.com/investors",
       sourceName: "DataFleet Governance Page",
+    },
+    {
+      id: "ev-marcus-sarah-email",
+      relationshipId: "rel-marcus-sarah",
+      type: "email_history",
+      description: "Synthetic test fixture: Direct email thread between Marcus Thorne and Sarah Chen coordinating on DataFleet board and governance in August 2026",
+      observedAt: "2026-08-20",
+      sourceName: "DataFleet Governance Email Archive (Synthetic Fixture)",
     },
     {
       id: "ev-sarah-horizon-website",
