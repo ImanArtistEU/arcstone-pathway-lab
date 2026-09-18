@@ -20,25 +20,30 @@ $$\mathbf{OBSERVATION\ TIME} \neq \mathbf{INTERACTION\ TIME}$$
 
 $$\mathbf{OUTREACH} \neq \mathbf{RECIPROCAL\ RELATIONSHIP}$$
 
+$$\mathbf{QUALIFICATION\ GATES\ TRAVERSAL}$$
+
+$$\mathbf{STRUCTURAL\ CONTEXT} \neq \mathbf{INTRODUCTION\ EDGE}$$
+
+$$\mathbf{PATH\ GENERATION} \neq \mathbf{PATH\ RANKING}$$
+
 1. **Network Visibility $\neq$ Introduction Credibility**: A weak tie or social graph connection may establish proximity, but Arcstone requires verifiable interaction or corroborated evidence before considering a relationship credible for a fundraising introduction.
 2. **Observation Time $\neq$ Interaction Time**: The time Arcstone observes or ingests an evidence artifact (`observedAt`) is strictly decoupled from the time the human interaction occurred (`interaction.occurredAt`).
 3. **Outreach $\neq$ Reciprocal Relationship**: One-way outbound outreach (e.g. unreplied email) does not constitute a reciprocal relationship and cannot qualify as introduction-eligible.
+4. **Qualification Gates Traversal**: Raw relationships cannot enter graph traversal without satisfying qualification admission criteria (`eligible` or `confirmation_required` when permitted).
+5. **Structural Context $\neq$ Introduction Edge**: Legal, organizational, and corporate affiliations (`works_at`, `board_member`, etc.) establish context, but organizations cannot introduce anyone. Pathways consist exclusively of person nodes.
+6. **Path Generation $\neq$ Path Ranking**: Path discovery discovers all valid simple routes within depth bounds. Ranking, multi-dimensional scoring, and target selection occur in subsequent pipeline stages.
 
 ## Current status
 
-Batch 2.2 — Qualification Contract Completion operational.
+Batch 3 — Deterministic Path Generation & Traversal Engine operational.
 
-## Graph Semantics & Qualification Contract
+## Graph Semantics & Path Traversal
 
 * **Observed Semantic Facts**: Relationships store empirical facts rather than assumptions. `Relationship.from` and `Relationship.to` encode semantic direction (e.g., Advisor $\rightarrow$ Advised Person).
-* **Direction vs. Traversal Permission**: Semantic edge direction is distinct from graph traversal permission. The fact that Marcus advises Elena does not prevent Elena from reaching Marcus; traversal rules are governed by downstream engines.
-* **Relationship Qualification Contract**: Evaluates introduction usability deterministically. Qualification requires:
-  1. Structural integrity and validated interaction metadata schema (`occurredAt`, `reciprocity`, `status`).
-  2. Interaction metadata restricted strictly to human interaction categories (`direct_interaction`, `founder_asserted`).
-  3. Valid reference evaluation date (`referenceDate`). Non-structural evaluations without a valid reference date yield `confirmation_required` with `INVALID_REFERENCE_DATE`.
-  4. Precise evidence provenance: reason codes (`RECENT_DIRECT_INTERACTION` vs `RECENT_INTERNAL_EVIDENCE`) reflect the specific winning evidence record rather than aggregate heuristics.
-* **Primary Fixture Negative Control**: Primary demonstration network strictly isolates Case D (Aurora Global Ventures / Isabel Torres) with zero non-structural edges, ensuring an absolute negative control for the future Path Generation engine. Edge cases (such as one-way unreplied emails) are isolated in separate test fixtures.
-* **Path Generation**: Future path search determines valid traversals from founder to candidate target investors.
+* **Direction vs. Traversal Permission**: Semantic edge direction is distinct from graph traversal permission. The fact that Marcus advises Elena does not prevent Elena from reaching Marcus; traversal rules are governed by centralized `TraversalPolicy`.
+* **Person-Only Introduction Graph**: Only relationships between two person nodes enter traversal. Structural affiliations provide target context but are never traversed as hops.
+* **Deterministic Bounded BFS**: Explores all simple paths from each founder to candidate target people up to `maxRelationshipHops` (default 3), eliminating cycles.
+* **Primary Fixture Negative Control**: Primary demonstration network strictly isolates Case D (Aurora Global Ventures / Isabel Torres) with zero non-structural edges, ensuring an absolute negative control for Path Generation.
 * **Referential Consistency**: Relationships and evidence are strictly bound with bidirectional referential integrity, preventing dangling or misattributed citations.
 
 ## Continuous Integration
@@ -56,7 +61,7 @@ PathwayDataset [IMPLEMENTED]
       ↓
 Relationship Qualification [IMPLEMENTED]
       ↓
-Path Generation [PLANNED]
+Path Generation [IMPLEMENTED]
       ↓
 Path Rejection [PLANNED]
       ↓

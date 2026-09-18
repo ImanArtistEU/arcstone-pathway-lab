@@ -157,13 +157,44 @@ export interface TargetInvestor {
 
 export type PathCandidateStatus = "candidate" | "rejected" | "eligible";
 
+export interface PathTraversalStep {
+  relationshipId: string;
+  fromPersonId: string;
+  toPersonId: string;
+  traversedReverse: boolean;
+  qualificationStatus: QualificationStatus;
+  qualificationReasonCodes: QualificationReasonCode[];
+}
+
 export interface PathCandidate {
   id: string;
   targetInvestorId: string;
+  sourceFounderPersonId: string;
+  targetPersonId: string;
   nodes: EntityReference[];
   relationshipIds: string[];
+  steps: PathTraversalStep[];
   intermediaryCount: number;
   status: PathCandidateStatus;
+  requiresConfirmationRelationshipIds: string[];
+}
+
+export type PathGenerationDisposition =
+  | "eligible_path_available"
+  | "confirmation_path_available"
+  | "no_known_path";
+
+export interface PathGenerationResult {
+  targetInvestorId: string;
+  campaignId: string;
+  sourceFounderPersonIds: string[];
+  targetPersonIds: string[];
+  paths: PathCandidate[];
+  eligiblePathCount: number;
+  confirmationRequiredPathCount: number;
+  disposition: PathGenerationDisposition;
+  coldOutreachRequired: boolean;
+  errors: string[];
 }
 
 export interface PathScore {

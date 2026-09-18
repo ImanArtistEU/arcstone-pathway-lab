@@ -1,6 +1,7 @@
 import { pathwayDemoDataset } from "@/data/fixtures/pathway-demo";
 import { assertDatasetIntegrity } from "@/lib/pathway/assertDatasetIntegrity";
 import { qualifyRelationships } from "@/lib/pathway/qualifyRelationships";
+import { generatePathsForTarget } from "@/lib/pathway/generatePathsForTarget";
 
 export default function HomePage() {
   const integrity = assertDatasetIntegrity(pathwayDemoDataset);
@@ -11,27 +12,18 @@ export default function HomePage() {
   const structuralCount = qualifications.filter((q) => q.status === "structural").length;
   const ineligibleCount = qualifications.filter((q) => q.status === "ineligible").length;
 
-  const qualMap = new Map(qualifications.map((q) => [q.relationshipId, q]));
+  const personMap = new Map(pathwayDemoDataset.people.map((p) => [p.id, p.fullName]));
+  const orgMap = new Map(pathwayDemoDataset.organizations.map((o) => [o.id, o.name]));
 
-  const formatStatus = (status?: string) => {
-    switch (status) {
-      case "eligible":
-        return "ELIGIBLE";
-      case "confirmation_required":
-        return "CONFIRMATION REQUIRED";
-      case "structural":
-        return "STRUCTURAL";
-      case "ineligible":
-        return "INELIGIBLE";
-      default:
-        return "UNKNOWN";
-    }
-  };
-
-  const elenaMarcus = formatStatus(qualMap.get("rel-elena-marcus")?.status);
-  const marcusSarah = formatStatus(qualMap.get("rel-marcus-sarah")?.status);
-  const elenaDavid = formatStatus(qualMap.get("rel-elena-david")?.status);
-  const elenaTom = formatStatus(qualMap.get("rel-elena-tom")?.status);
+  const targets = pathwayDemoDataset.targetInvestors.map((target) => {
+    const orgName = orgMap.get(target.investorOrganizationId) || target.investorOrganizationId;
+    const result = generatePathsForTarget(pathwayDemoDataset, target.id, "2026-09-18");
+    return {
+      targetId: target.id,
+      orgName,
+      result,
+    };
+  });
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-gray-50">
@@ -44,7 +36,7 @@ export default function HomePage() {
         </p>
 
         <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 mb-6">
-          Batch 2.2 — Qualification contract operational
+          Batch 3 — Path generation operational
         </div>
 
         {/* Dataset Counts */}
@@ -106,27 +98,55 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Demo Scenario Results */}
-        <div className="border-t border-gray-100 pt-5 text-left mb-5 space-y-2 text-sm">
+        {/* Path Generation Results */}
+        <div className="border-t border-gray-100 pt-5 text-left mb-5 space-y-3">
           <span className="text-xs uppercase tracking-wider text-gray-500 font-medium block mb-2">
-            Key Demo Qualifications
+            Path Generation by Target
           </span>
-          <div className="flex justify-between items-center py-1 border-b border-gray-50">
-            <span className="text-gray-700">Founder ↔ Advisor:</span>
-            <span className="font-semibold text-emerald-600">{elenaMarcus}</span>
-          </div>
-          <div className="flex justify-between items-center py-1 border-b border-gray-50">
-            <span className="text-gray-700">Advisor ↔ Horizon Partner:</span>
-            <span className="font-semibold text-emerald-600">{marcusSarah}</span>
-          </div>
-          <div className="flex justify-between items-center py-1 border-b border-gray-50">
-            <span className="text-gray-700">Founder ↔ Beacon Partner (LinkedIn only):</span>
-            <span className="font-semibold text-amber-600">{elenaDavid}</span>
-          </div>
-          <div className="flex justify-between items-center py-1">
-            <span className="text-gray-700">Founder ↔ Former Colleague:</span>
-            <span className="font-semibold text-amber-600">{elenaTom}</span>
-          </div>
+          {targets.map(({ targetId, orgName, result }) => {
+            const hasPaths = result.paths.length > 0;
+            const primaryPath = hasPaths ? result.paths[0] : null;
+            const routeStr = primaryPath
+              ? primaryPath.nodes
+                  .map((n) => personMap.get(n.id) || n.id)
+                  .join(" → ")
+              : "Cold outreach required";
+
+            const badgeText =
+              result.disposition === "eligible_path_available"
+                ? "ELIGIBLE PATH"
+                : result.disposition === "confirmation_path_available"
+                ? "CONFIRMATION REQUIRED"
+                : "NO KNOWN PATH";
+
+            const badgeClass =
+              result.disposition === "eligible_path_available"
+                ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                : result.disposition === "confirmation_path_available"
+                ? "text-amber-700 bg-amber-50 border-amber-200"
+                : "text-slate-700 bg-slate-50 border-slate-200";
+
+            return (
+              <div
+                key={targetId}
+                className="p-3 rounded-lg border border-gray-100 bg-gray-50/50 space-y-1"
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-gray-900 text-sm">
+                    {orgName}
+                  </span>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded border font-medium ${badgeClass}`}
+                  >
+                    {badgeText}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-600 font-mono">
+                  {routeStr}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="border-t border-gray-100 pt-4 text-sm flex justify-between items-center">
