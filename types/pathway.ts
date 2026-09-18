@@ -104,14 +104,27 @@ export type RelationshipEvidenceType =
   | "manual_research"
   | "other";
 
+export type InteractionReciprocity = "two_way" | "one_way" | "unknown";
+
+export type InteractionStatus = "confirmed" | "unconfirmed";
+
+export interface InteractionEvidenceDetails {
+  occurredAt: string;
+  reciprocity: InteractionReciprocity;
+  status: InteractionStatus;
+}
+
 export interface RelationshipEvidence {
   id: string;
   relationshipId: string;
   type: RelationshipEvidenceType;
   description: string;
+  /** When Arcstone observed, ingested, or recorded this evidence artifact */
   observedAt?: string;
   sourceUrl?: string;
   sourceName?: string;
+  /** Underlying human interaction details if this evidence represents an interaction */
+  interaction?: InteractionEvidenceDetails;
   metadata?: Record<string, unknown>;
 }
 
@@ -237,6 +250,9 @@ export interface EvidenceSummary {
   founderAsserted: number;
   publicContext: number;
   platformSignal: number;
+  confirmedTwoWayInteraction: number;
+  oneWayInteraction: number;
+  unconfirmedInteraction: number;
 }
 
 export type QualificationReasonCode =
@@ -249,7 +265,11 @@ export type QualificationReasonCode =
   | "NO_DIRECT_INTERACTION"
   | "STALE_INTERACTION"
   | "AGING_INTERACTION"
-  | "NO_EVIDENCE";
+  | "NO_EVIDENCE"
+  | "FUTURE_INTERACTION_DATE"
+  | "INVALID_INTERACTION_DATE"
+  | "ONE_WAY_OUTREACH_ONLY"
+  | "UNCONFIRMED_INTERACTION";
 
 export interface RelationshipQualification {
   relationshipId: string;

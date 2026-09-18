@@ -271,6 +271,17 @@ export const pathwayDemoDataset: PathwayDataset = {
       startedAt: "2019-04-01",
       lastObservedAt: "2026-09-01",
     },
+    // Outbound Outreach Example (Batch 2.1): Founder Elena -> VC Partner Isabel (unreplied outbound email)
+    {
+      id: "rel-elena-isabel-outbound",
+      from: { type: "person", id: "person-founder-elena" },
+      to: { type: "person", id: "person-vc-isabel" },
+      type: "other",
+      direction: "directed",
+      evidenceIds: ["ev-elena-isabel-outbound"],
+      startedAt: "2026-09-14",
+      lastObservedAt: "2026-09-15",
+    },
   ],
 
   relationshipEvidence: [
@@ -309,6 +320,11 @@ export const pathwayDemoDataset: PathwayDataset = {
       type: "meeting_history",
       description: "Recurring monthly strategic advisory sessions held across 2023-2026, with most recent session logged September 2026",
       observedAt: "2026-09-10",
+      interaction: {
+        occurredAt: "2026-09-10",
+        reciprocity: "two_way",
+        status: "confirmed",
+      },
       sourceName: "Google Calendar Sync Logs",
     },
     {
@@ -335,6 +351,11 @@ export const pathwayDemoDataset: PathwayDataset = {
       type: "email_history",
       description: "Synthetic test fixture: Direct email thread between Marcus Thorne and Sarah Chen coordinating on DataFleet board and governance in August 2026",
       observedAt: "2026-08-20",
+      interaction: {
+        occurredAt: "2026-08-20",
+        reciprocity: "two_way",
+        status: "confirmed",
+      },
       sourceName: "DataFleet Governance Email Archive (Synthetic Fixture)",
     },
     {
@@ -382,8 +403,13 @@ export const pathwayDemoDataset: PathwayDataset = {
       relationshipId: "rel-tom-clara",
       type: "user_reported",
       description: "Colleagues in engineering group from Jan 2015 to May 2016; no contact since May 2016",
-      observedAt: "2016-05-30",
-      sourceName: "Founder Survey Response",
+      observedAt: "2026-09-18",
+      interaction: {
+        occurredAt: "2016-05-30",
+        reciprocity: "two_way",
+        status: "confirmed",
+      },
+      sourceName: "Founder Survey Response (Observed September 2026)",
     },
     {
       id: "ev-clara-summit-website",
@@ -404,6 +430,20 @@ export const pathwayDemoDataset: PathwayDataset = {
       observedAt: "2026-09-01",
       sourceUrl: "https://aurora-global-example.com/team/isabel-torres",
       sourceName: "Aurora Global Ventures Website",
+    },
+    // Outbound Outreach Evidence (Batch 2.1): Confirmed one-way outbound pitch email
+    {
+      id: "ev-elena-isabel-outbound",
+      relationshipId: "rel-elena-isabel-outbound",
+      type: "email_history",
+      description: "Synthetic test fixture: Founder Elena Vance sent cold pitch email to Isabel Torres with no reply received",
+      observedAt: "2026-09-15",
+      interaction: {
+        occurredAt: "2026-09-14",
+        reciprocity: "one_way",
+        status: "confirmed",
+      },
+      sourceName: "Founder Outbox Email Logs (Synthetic Fixture)",
     },
   ],
 

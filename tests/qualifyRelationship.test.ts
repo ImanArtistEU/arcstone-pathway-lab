@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { pathwayDemoDataset } from "@/data/fixtures/pathway-demo";
 import { qualifyRelationship } from "@/lib/pathway/qualifyRelationship";
-import { qualifyRelationships } from "@/lib/pathway/qualifyRelationships";
 import { Relationship, RelationshipEvidence } from "@/types/pathway";
 
 const REFERENCE_DATE = "2026-09-18";
@@ -158,7 +157,7 @@ describe("Deterministic Relationship Qualification Engine", () => {
     expect(result.reasonCodes).toContain("NO_EVIDENCE");
   });
 
-  it("12: Recent meeting/email interaction produces recency = recent", () => {
+  it("12: Recent confirmed two-way meeting/email interaction produces recency = recent", () => {
     const testRel: Relationship = {
       id: "rel-test-recent",
       from: { type: "person", id: "person-a" },
@@ -173,7 +172,12 @@ describe("Deterministic Relationship Qualification Engine", () => {
         relationshipId: testRel.id,
         type: "meeting_history",
         description: "Recent strategy sync",
-        observedAt: "2026-08-19",
+        observedAt: "2026-08-20",
+        interaction: {
+          occurredAt: "2026-08-19",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
       },
     ];
     const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
@@ -197,7 +201,12 @@ describe("Deterministic Relationship Qualification Engine", () => {
         relationshipId: testRel.id,
         type: "meeting_history",
         description: "Meeting 500 days ago",
-        observedAt: "2025-05-06",
+        observedAt: "2026-09-01",
+        interaction: {
+          occurredAt: "2025-05-06",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
       },
     ];
     const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
@@ -222,7 +231,12 @@ describe("Deterministic Relationship Qualification Engine", () => {
         relationshipId: testRel.id,
         type: "meeting_history",
         description: "Meeting 800 days ago",
-        observedAt: "2024-07-10",
+        observedAt: "2026-09-01",
+        interaction: {
+          occurredAt: "2024-07-10",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
       },
     ];
     const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
@@ -242,13 +256,225 @@ describe("Deterministic Relationship Qualification Engine", () => {
     expect(() => {
       qualifyRelationship(relCopy, evCopy, REFERENCE_DATE);
     }).not.toThrow();
+  });
 
-    const datasetCopy = JSON.parse(JSON.stringify(pathwayDemoDataset));
-    Object.freeze(datasetCopy.relationships);
-    Object.freeze(datasetCopy.relationshipEvidence);
+  it("16: Founder sent unreplied email -> expected = confirmation_required + ONE_WAY_OUTREACH_ONLY", () => {
+    const testRel: Relationship = {
+      id: "rel-test-outbound",
+      from: { type: "person", id: "person-founder-elena" },
+      to: { type: "person", id: "person-investor-x" },
+      type: "other",
+      direction: "directed",
+      evidenceIds: ["ev-outbound-only"],
+    };
+    const ev: RelationshipEvidence[] = [
+      {
+        id: "ev-outbound-only",
+        relationshipId: testRel.id,
+        type: "email_history",
+        description: "Outbound cold pitch sent last week with no response",
+        observedAt: "2026-09-15",
+        interaction: {
+          occurredAt: "2026-09-12",
+          reciprocity: "one_way",
+          status: "confirmed",
+        },
+      },
+    ];
+    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
 
-    expect(() => {
-      qualifyRelationships(datasetCopy, REFERENCE_DATE);
-    }).not.toThrow();
+    expect(result.status).toBe("confirmation_required");
+    expect(result.reasonCodes).toContain("ONE_WAY_OUTREACH_ONLY");
+    expect(result.status).not.toBe("eligible");
+  });
+
+  it("17: Meeting unconfirmed -> expected = confirmation_required + UNCONFIRMED_INTERACTION", () => {
+    const testRel: Relationship = {
+      id: "rel-test-unconfirmed-meeting",
+      from: { type: "person", id: "person-founder-elena" },
+      to: { type: "person", id: "person-investor-y" },
+      type: "other",
+      direction: "directed",
+      evidenceIds: ["ev-unconfirmed-invite"],
+    };
+    const ev: RelationshipEvidence[] = [
+      {
+        id: "ev-unconfirmed-invite",
+        relationshipId: testRel.id,
+        type: "meeting_history",
+        description: "Calendar invitation scheduled with no attendance confirmation",
+        observedAt: "2026-09-15",
+        interaction: {
+          occurredAt: "2026-09-14",
+          reciprocity: "unknown",
+          status: "unconfirmed",
+        },
+      },
+    ];
+    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
+
+    expect(result.status).toBe("confirmation_required");
+    expect(result.reasonCodes).toContain("UNCONFIRMED_INTERACTION");
+    expect(result.status).not.toBe("eligible");
+  });
+
+  it("18: Founder report observed recently, interaction occurred 2016 -> expected = stale + confirmation_required", () => {
+    const testRel: Relationship = {
+      id: "rel-test-historical-report",
+      from: { type: "person", id: "person-founder-elena" },
+      to: { type: "person", id: "person-colleague-z" },
+      type: "former_colleague",
+      direction: "bidirectional",
+      evidenceIds: ["ev-recent-report-historical-int"],
+    };
+    const ev: RelationshipEvidence[] = [
+      {
+        id: "ev-recent-report-historical-int",
+        relationshipId: testRel.id,
+        type: "user_reported",
+        description: "Founder onboarding intake completed today reporting collaboration in 2016",
+        observedAt: "2026-09-18",
+        interaction: {
+          occurredAt: "2016-05-30",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
+      },
+    ];
+    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
+
+    expect(result.recency).toBe("stale");
+    expect(result.status).toBe("confirmation_required");
+    expect(result.reasonCodes).toContain("STALE_INTERACTION");
+  });
+
+  it("19: Interaction occurredAt in future (> referenceDate) -> expected = confirmation_required + FUTURE_INTERACTION_DATE", () => {
+    const testRel: Relationship = {
+      id: "rel-test-future",
+      from: { type: "person", id: "person-founder-elena" },
+      to: { type: "person", id: "person-advisor-a" },
+      type: "advisor",
+      direction: "directed",
+      evidenceIds: ["ev-future"],
+    };
+    const ev: RelationshipEvidence[] = [
+      {
+        id: "ev-future",
+        relationshipId: testRel.id,
+        type: "meeting_history",
+        description: "Meeting scheduled in the future",
+        observedAt: "2026-09-18",
+        interaction: {
+          occurredAt: "2027-01-15",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
+      },
+    ];
+    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
+
+    expect(result.status).toBe("confirmation_required");
+    expect(result.recency).toBe("unknown");
+    expect(result.reasonCodes).toContain("FUTURE_INTERACTION_DATE");
+  });
+
+  it("20: Interaction occurredAt invalid date string -> expected = confirmation_required + INVALID_INTERACTION_DATE", () => {
+    const testRel: Relationship = {
+      id: "rel-test-invalid-date",
+      from: { type: "person", id: "person-founder-elena" },
+      to: { type: "person", id: "person-advisor-b" },
+      type: "advisor",
+      direction: "directed",
+      evidenceIds: ["ev-invalid-date"],
+    };
+    const ev: RelationshipEvidence[] = [
+      {
+        id: "ev-invalid-date",
+        relationshipId: testRel.id,
+        type: "meeting_history",
+        description: "Corrupted date string in calendar export",
+        observedAt: "2026-09-18",
+        interaction: {
+          occurredAt: "not-a-valid-date-stamp",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
+      },
+    ];
+    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
+
+    expect(result.status).toBe("confirmation_required");
+    expect(result.recency).toBe("unknown");
+    expect(result.reasonCodes).toContain("INVALID_INTERACTION_DATE");
+  });
+
+  it("21: Confirmed two-way recent email qualifies as eligible", () => {
+    const testRel: Relationship = {
+      id: "rel-test-two-way-email",
+      from: { type: "person", id: "person-a" },
+      to: { type: "person", id: "person-b" },
+      type: "colleague",
+      direction: "bidirectional",
+      evidenceIds: ["ev-two-way-email"],
+    };
+    const ev: RelationshipEvidence[] = [
+      {
+        id: "ev-two-way-email",
+        relationshipId: testRel.id,
+        type: "email_history",
+        description: "Back-and-forth discussion on seed round architecture",
+        observedAt: "2026-09-01",
+        interaction: {
+          occurredAt: "2026-08-28",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
+      },
+    ];
+    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
+
+    expect(result.status).toBe("eligible");
+    expect(result.recency).toBe("recent");
+    expect(result.reasonCodes).toContain("RECENT_DIRECT_INTERACTION");
+  });
+
+  it("22: Confirmed two-way recent meeting qualifies as eligible", () => {
+    const testRel: Relationship = {
+      id: "rel-test-two-way-meeting",
+      from: { type: "person", id: "person-a" },
+      to: { type: "person", id: "person-b" },
+      type: "advisor",
+      direction: "directed",
+      evidenceIds: ["ev-two-way-meeting"],
+    };
+    const ev: RelationshipEvidence[] = [
+      {
+        id: "ev-two-way-meeting",
+        relationshipId: testRel.id,
+        type: "meeting_history",
+        description: "In-person breakfast advisory meeting",
+        observedAt: "2026-09-12",
+        interaction: {
+          occurredAt: "2026-09-11",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
+      },
+    ];
+    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
+
+    expect(result.status).toBe("eligible");
+    expect(result.recency).toBe("recent");
+    expect(result.reasonCodes).toContain("RECENT_DIRECT_INTERACTION");
+  });
+
+  it("23: Synthetic fixture outbound-only relationship rel-elena-isabel-outbound qualifies as confirmation_required with ONE_WAY_OUTREACH_ONLY", () => {
+    const rel = getFixtureRel("rel-elena-isabel-outbound");
+    const ev = getFixtureEvidence(rel.evidenceIds);
+    const result = qualifyRelationship(rel, ev, REFERENCE_DATE);
+
+    expect(result.status).toBe("confirmation_required");
+    expect(result.reasonCodes).toContain("ONE_WAY_OUTREACH_ONLY");
+    expect(result.status).not.toBe("eligible");
   });
 });

@@ -12,15 +12,21 @@ Every major capability must be:
 3. based on explicit evidence,
 4. validated before product integration.
 
-## Core Invariant
+## Core Invariants
 
 $$\mathbf{NETWORK\ VISIBILITY} \neq \mathbf{INTRODUCTION\ CREDIBILITY}$$
 
-A weak tie or social graph connection may establish proximity, but Arcstone requires verifiable interaction or corroborated evidence before considering a relationship credible for a fundraising introduction.
+$$\mathbf{OBSERVATION\ TIME} \neq \mathbf{INTERACTION\ TIME}$$
+
+$$\mathbf{OUTREACH} \neq \mathbf{RECIPROCAL\ RELATIONSHIP}$$
+
+1. **Network Visibility $\neq$ Introduction Credibility**: A weak tie or social graph connection may establish proximity, but Arcstone requires verifiable interaction or corroborated evidence before considering a relationship credible for a fundraising introduction.
+2. **Observation Time $\neq$ Interaction Time**: The time Arcstone observes or ingests an evidence artifact (`observedAt`) is strictly decoupled from the time the human interaction occurred (`interaction.occurredAt`).
+3. **Outreach $\neq$ Reciprocal Relationship**: One-way outbound outreach (e.g. unreplied email) does not constitute a reciprocal relationship and cannot qualify as introduction-eligible.
 
 ## Current status
 
-Batch 2 — Deterministic Relationship Qualification Engine operational.
+Batch 2.1 — Interaction Evidence Hardening operational.
 
 ## Graph Semantics
 
