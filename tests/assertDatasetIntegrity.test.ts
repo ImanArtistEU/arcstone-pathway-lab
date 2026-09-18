@@ -30,7 +30,7 @@ describe("Dataset Integrity Validator", () => {
     expect(result.valid).toBe(false);
     expect(
       result.errors.some((err) =>
-        err.includes("nonexistent person \"person-ghost-does-not-exist\"")
+        err.includes('nonexistent person "person-ghost-does-not-exist"')
       )
     ).toBe(true);
   });
@@ -53,7 +53,7 @@ describe("Dataset Integrity Validator", () => {
     expect(result.valid).toBe(false);
     expect(
       result.errors.some((err) =>
-        err.includes("nonexistent relationship \"rel-nonexistent-id\"")
+        err.includes('nonexistent relationship "rel-nonexistent-id"')
       )
     ).toBe(true);
   });
@@ -77,7 +77,7 @@ describe("Dataset Integrity Validator", () => {
     expect(result.valid).toBe(false);
     expect(
       result.errors.some((err) =>
-        err.includes("Duplicate ID detected: \"person-founder-elena\"")
+        err.includes('Duplicate ID detected: "person-founder-elena"')
       )
     ).toBe(true);
   });
@@ -92,7 +92,7 @@ describe("Dataset Integrity Validator", () => {
           founderPersonIds: ["person-ghost-founder"],
           round: "Series A",
           status: "active",
-          createdAt: "2024-09-01T00:00:00Z",
+          createdAt: "2026-09-01T00:00:00Z",
         },
       ],
     };
@@ -101,12 +101,12 @@ describe("Dataset Integrity Validator", () => {
     expect(result.valid).toBe(false);
     expect(
       result.errors.some((err) =>
-        err.includes("nonexistent startup \"startup-does-not-exist\"")
+        err.includes('nonexistent startup "startup-does-not-exist"')
       )
     ).toBe(true);
     expect(
       result.errors.some((err) =>
-        err.includes("nonexistent founder person \"person-ghost-founder\"")
+        err.includes('nonexistent founder person "person-ghost-founder"')
       )
     ).toBe(true);
   });
@@ -129,17 +129,69 @@ describe("Dataset Integrity Validator", () => {
     expect(result.valid).toBe(false);
     expect(
       result.errors.some((err) =>
-        err.includes("nonexistent campaign \"camp-does-not-exist\"")
+        err.includes('nonexistent campaign "camp-does-not-exist"')
       )
     ).toBe(true);
     expect(
       result.errors.some((err) =>
-        err.includes("nonexistent investor organization \"org-does-not-exist\"")
+        err.includes('nonexistent investor organization "org-does-not-exist"')
       )
     ).toBe(true);
     expect(
       result.errors.some((err) =>
-        err.includes("nonexistent person \"person-does-not-exist\"")
+        err.includes('nonexistent person "person-does-not-exist"')
+      )
+    ).toBe(true);
+  });
+
+  it("G: fails when Relationship A references an existing evidence object whose relationshipId belongs to Relationship B", () => {
+    // ev-founder-nexus-web belongs to rel-founder-nexus.
+    // rel-elena-david incorrectly references ev-founder-nexus-web in its evidenceIds.
+    const brokenDataset: PathwayDataset = {
+      ...pathwayDemoDataset,
+      relationships: pathwayDemoDataset.relationships.map((rel) =>
+        rel.id === "rel-elena-david"
+          ? {
+              ...rel,
+              evidenceIds: [...rel.evidenceIds, "ev-founder-nexus-web"],
+            }
+          : rel
+      ),
+    };
+
+    const result = assertDatasetIntegrity(brokenDataset);
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some((err) =>
+        err.includes(
+          'Relationship "rel-elena-david" references evidence "ev-founder-nexus-web", but evidence "ev-founder-nexus-web" belongs to relationship "rel-founder-nexus"'
+        )
+      )
+    ).toBe(true);
+  });
+
+  it("H: fails when an evidence object correctly names Relationship A but Relationship A does not list that evidence ID in its evidenceIds array", () => {
+    // Add new evidence pointing to rel-founder-nexus, but omit it from rel-founder-nexus.evidenceIds.
+    const brokenDataset: PathwayDataset = {
+      ...pathwayDemoDataset,
+      relationshipEvidence: [
+        ...pathwayDemoDataset.relationshipEvidence,
+        {
+          id: "ev-unlisted-article",
+          relationshipId: "rel-founder-nexus",
+          type: "news_article",
+          description: "Unlisted news article referencing relationship",
+        },
+      ],
+    };
+
+    const result = assertDatasetIntegrity(brokenDataset);
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some((err) =>
+        err.includes(
+          'Evidence "ev-unlisted-article" points to relationship "rel-founder-nexus", but relationship "rel-founder-nexus" does not list evidence "ev-unlisted-article" in its evidenceIds'
+        )
       )
     ).toBe(true);
   });

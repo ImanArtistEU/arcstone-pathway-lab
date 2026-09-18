@@ -16,6 +16,22 @@ Every major capability must be:
 
 Batch 1 — Domain model and synthetic network fixtures.
 
+## Graph Semantics
+
+* **Observed Semantic Facts**: Relationships store empirical facts rather than assumptions. `Relationship.from` and `Relationship.to` encode semantic direction (e.g., Advisor $\rightarrow$ Advised Person).
+* **Direction vs. Traversal Permission**: Semantic edge direction is distinct from graph traversal permission. The fact that Marcus advises Elena does not prevent Elena from reaching Marcus; traversal rules are governed by downstream engines.
+* **Relationship Qualification**: Future deterministic rules evaluate relationship usability, freshness, and evidence weight.
+* **Path Generation**: Future path search determines valid traversals from founder to candidate target investors.
+* **Referential Consistency**: Relationships and evidence are strictly bound with bidirectional referential integrity, preventing dangling or misattributed citations.
+
+## Continuous Integration
+
+GitHub Actions CI (`.github/workflows/ci.yml`) independently validates every commit and pull request targeting `main`:
+* TypeScript typechecking (`npm run typecheck`)
+* Unit & regression test suite (`npm run test`)
+* ESLint validation (`npm run lint`)
+* Production build (`npm run build`)
+
 ## Planned High-Level Deterministic Pipeline
 
 ```

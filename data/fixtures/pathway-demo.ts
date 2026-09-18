@@ -3,11 +3,14 @@ import { PathwayDataset } from "@/types/pathway";
 /**
  * Synthetic Pathway Intelligence Demo Dataset
  *
+ * Current project date context: September 2026.
+ *
  * Fictional startup, founders, investors, and network relationships demonstrating:
- * - CASE A: Strong route exists (Founder -> Advisor -> VC Partner with multiple explicit evidence items)
- * - CASE B: LinkedIn-only connection (Founder -> VC Partner with only 1st degree connection evidence)
- * - CASE C: Stale historical connection (Founder -> Former Colleague -> Investor with old dates)
- * - CASE D: No known path (Target investor with no network chain from founder)
+ * - CASE A: Current strong route (Founder Elena <-> Advisor Marcus <-> VC Partner Sarah with active 2026 evidence)
+ *           Direction semantic: Marcus (Advisor) -> Elena (advised Person), directed
+ * - CASE B: Recent LinkedIn-only connection (Founder Elena <-> VC Partner David with 2026 LinkedIn link only)
+ * - CASE C: Stale historical connection (Founder Elena <-> Colleague Tom <-> Investor Clara with 2015-2019 dates)
+ * - CASE D: No known path (Target investor Isabel / Aurora with 2026 presence, but 0 paths from founder)
  */
 export const pathwayDemoDataset: PathwayDataset = {
   startups: [
@@ -149,14 +152,15 @@ export const pathwayDemoDataset: PathwayDataset = {
       direction: "directed",
       evidenceIds: ["ev-founder-nexus-web"],
       startedAt: "2023-01-01",
+      lastObservedAt: "2026-09-01",
     },
 
     // CASE A: Strong Route
-    // Founder Elena -> Advisor Marcus
+    // Semantic direction: Advisor Marcus -> advised Person Elena (directed)
     {
       id: "rel-elena-marcus",
-      from: { type: "person", id: "person-founder-elena" },
-      to: { type: "person", id: "person-advisor-marcus" },
+      from: { type: "person", id: "person-advisor-marcus" },
+      to: { type: "person", id: "person-founder-elena" },
       type: "advisor",
       direction: "directed",
       evidenceIds: [
@@ -165,9 +169,9 @@ export const pathwayDemoDataset: PathwayDataset = {
         "ev-elena-marcus-meetings",
       ],
       startedAt: "2023-01-15",
-      lastObservedAt: "2024-09-01",
+      lastObservedAt: "2026-09-01",
     },
-    // Advisor Marcus -> VC Partner Sarah
+    // Advisor Marcus <-> VC Partner Sarah (co_invested is bidirectional)
     {
       id: "rel-marcus-sarah",
       from: { type: "person", id: "person-advisor-marcus" },
@@ -176,9 +180,9 @@ export const pathwayDemoDataset: PathwayDataset = {
       direction: "bidirectional",
       evidenceIds: ["ev-marcus-sarah-press", "ev-marcus-sarah-board"],
       startedAt: "2021-06-01",
-      lastObservedAt: "2024-08-15",
+      lastObservedAt: "2026-08-15",
     },
-    // VC Partner Sarah -> Horizon Ventures
+    // VC Partner Sarah -> Horizon Ventures (works_at is directed)
     {
       id: "rel-sarah-horizon",
       from: { type: "person", id: "person-vc-sarah" },
@@ -187,10 +191,11 @@ export const pathwayDemoDataset: PathwayDataset = {
       direction: "directed",
       evidenceIds: ["ev-sarah-horizon-website"],
       startedAt: "2020-01-01",
+      lastObservedAt: "2026-09-01",
     },
 
     // CASE B: LinkedIn-only Connection
-    // Founder Elena -> VC Partner David
+    // Founder Elena <-> VC Partner David (linkedin_connection is bidirectional)
     {
       id: "rel-elena-david",
       from: { type: "person", id: "person-founder-elena" },
@@ -198,8 +203,8 @@ export const pathwayDemoDataset: PathwayDataset = {
       type: "linkedin_connection",
       direction: "bidirectional",
       evidenceIds: ["ev-elena-david-linkedin"],
-      startedAt: "2024-02-10",
-      lastObservedAt: "2024-08-01",
+      startedAt: "2026-02-10",
+      lastObservedAt: "2026-08-01",
     },
     // VC Partner David -> Beacon Capital
     {
@@ -210,10 +215,11 @@ export const pathwayDemoDataset: PathwayDataset = {
       direction: "directed",
       evidenceIds: ["ev-david-beacon-website"],
       startedAt: "2022-03-01",
+      lastObservedAt: "2026-09-01",
     },
 
-    // CASE C: Stale / Weak Historical Connection
-    // Founder Elena -> Former Colleague Tom
+    // CASE C: Stale / Weak Historical Connection (Old dates preserved)
+    // Founder Elena <-> Former Colleague Tom
     {
       id: "rel-elena-tom",
       from: { type: "person", id: "person-founder-elena" },
@@ -225,7 +231,7 @@ export const pathwayDemoDataset: PathwayDataset = {
       endedAt: "2019-08-31",
       lastObservedAt: "2019-08-31",
     },
-    // Former Colleague Tom -> VC Partner Clara
+    // Former Colleague Tom <-> VC Partner Clara
     {
       id: "rel-tom-clara",
       from: { type: "person", id: "person-colleague-tom" },
@@ -246,10 +252,11 @@ export const pathwayDemoDataset: PathwayDataset = {
       direction: "directed",
       evidenceIds: ["ev-clara-summit-website"],
       startedAt: "2021-09-01",
+      lastObservedAt: "2026-09-01",
     },
 
     // CASE D: No Known Path
-    // VC Partner Isabel -> Aurora Global Ventures (no connection to Elena or her network)
+    // VC Partner Isabel -> Aurora Global Ventures (active affiliation in 2026, no path from founder)
     {
       id: "rel-isabel-aurora",
       from: { type: "person", id: "person-vc-isabel" },
@@ -258,6 +265,7 @@ export const pathwayDemoDataset: PathwayDataset = {
       direction: "directed",
       evidenceIds: ["ev-isabel-aurora-website"],
       startedAt: "2019-04-01",
+      lastObservedAt: "2026-09-01",
     },
   ],
 
@@ -268,12 +276,12 @@ export const pathwayDemoDataset: PathwayDataset = {
       relationshipId: "rel-founder-nexus",
       type: "company_website",
       description: "Elena Vance listed as Founder & CEO on Nexus AI website",
-      observedAt: "2024-09-01",
+      observedAt: "2026-09-01",
       sourceUrl: "https://nexus-ai-example.com/about",
       sourceName: "Nexus AI Official Website",
     },
 
-    // Case A: Strong Route Evidence (Multiple independent sources)
+    // Case A: Strong Route Evidence (Current 2026 observations corroborating active relationship)
     {
       id: "ev-elena-marcus-agreement",
       relationshipId: "rel-elena-marcus",
@@ -286,8 +294,8 @@ export const pathwayDemoDataset: PathwayDataset = {
       id: "ev-elena-marcus-website",
       relationshipId: "rel-elena-marcus",
       type: "company_website",
-      description: "Marcus Thorne featured as official Strategic Advisor on company team page",
-      observedAt: "2024-08-01",
+      description: "Marcus Thorne actively listed as Strategic Advisor on Nexus AI team page as of September 2026",
+      observedAt: "2026-09-01",
       sourceUrl: "https://nexus-ai-example.com/team",
       sourceName: "Nexus AI Official Website",
     },
@@ -295,15 +303,15 @@ export const pathwayDemoDataset: PathwayDataset = {
       id: "ev-elena-marcus-meetings",
       relationshipId: "rel-elena-marcus",
       type: "meeting_history",
-      description: "14 recurring monthly strategic advisory sessions held across 2023-2024",
-      observedAt: "2024-08-20",
+      description: "Recurring monthly strategic advisory sessions held across 2023-2026, with most recent session logged September 2026",
+      observedAt: "2026-09-10",
       sourceName: "Google Calendar Sync Logs",
     },
     {
       id: "ev-marcus-sarah-press",
       relationshipId: "rel-marcus-sarah",
       type: "press_release",
-      description: "Joint lead syndicate investment in DataFleet Series Seed announced publicly",
+      description: "Joint lead syndicate investment in DataFleet Series Seed announced publicly in June 2021",
       observedAt: "2021-06-01",
       sourceUrl: "https://prnewswire.example.com/datafleet-seed-round",
       sourceName: "PR Newswire Syndicate Release",
@@ -312,8 +320,8 @@ export const pathwayDemoDataset: PathwayDataset = {
       id: "ev-marcus-sarah-board",
       relationshipId: "rel-marcus-sarah",
       type: "portfolio_page",
-      description: "Both Marcus Thorne and Sarah Chen listed as active board observers on DataFleet portfolio page",
-      observedAt: "2024-07-15",
+      description: "Both Marcus Thorne and Sarah Chen listed as active board observers on DataFleet portfolio page as of August 2026",
+      observedAt: "2026-08-15",
       sourceUrl: "https://datafleet-example.com/investors",
       sourceName: "DataFleet Governance Page",
     },
@@ -321,19 +329,19 @@ export const pathwayDemoDataset: PathwayDataset = {
       id: "ev-sarah-horizon-website",
       relationshipId: "rel-sarah-horizon",
       type: "company_website",
-      description: "Sarah Chen listed as General Partner at Horizon Ventures",
-      observedAt: "2024-09-01",
+      description: "Sarah Chen listed as General Partner at Horizon Ventures as of September 2026",
+      observedAt: "2026-09-01",
       sourceUrl: "https://horizon-vc-example.com/team/sarah-chen",
       sourceName: "Horizon Ventures Website",
     },
 
-    // Case B: LinkedIn-only Connection Evidence (Single weak evidence)
+    // Case B: LinkedIn-only Connection Evidence (Recent 2026 observation, but solitary weak signal)
     {
       id: "ev-elena-david-linkedin",
       relationshipId: "rel-elena-david",
       type: "linkedin",
-      description: "1st degree connection on LinkedIn with no message exchange or joint interaction",
-      observedAt: "2024-08-01",
+      description: "1st degree connection on LinkedIn observed August 2026 with no message exchange or joint interaction",
+      observedAt: "2026-08-01",
       sourceUrl: "https://linkedin.example.com/in/david-miller-beacon",
       sourceName: "LinkedIn Network Export",
     },
@@ -341,13 +349,13 @@ export const pathwayDemoDataset: PathwayDataset = {
       id: "ev-david-beacon-website",
       relationshipId: "rel-david-beacon",
       type: "company_website",
-      description: "David Miller listed as Partner at Beacon Capital",
-      observedAt: "2024-09-01",
+      description: "David Miller listed as Partner at Beacon Capital as of September 2026",
+      observedAt: "2026-09-01",
       sourceUrl: "https://beacon-cap-example.com/team/david-miller",
       sourceName: "Beacon Capital Website",
     },
 
-    // Case C: Stale Historical Evidence (Old dates, no recent activity)
+    // Case C: Stale Historical Evidence (Preserved historical dates, no activity since 2016/2019)
     {
       id: "ev-elena-tom-pastwork",
       relationshipId: "rel-elena-tom",
@@ -369,19 +377,19 @@ export const pathwayDemoDataset: PathwayDataset = {
       id: "ev-clara-summit-website",
       relationshipId: "rel-clara-summit",
       type: "company_website",
-      description: "Clara Oswald listed as Partner at Summit Ridge Capital",
-      observedAt: "2024-09-01",
+      description: "Clara Oswald listed as Partner at Summit Ridge Capital as of September 2026",
+      observedAt: "2026-09-01",
       sourceUrl: "https://summit-ridge-example.com/team/clara-oswald",
       sourceName: "Summit Ridge Capital Website",
     },
 
-    // Case D: Target Investor Affiliation Evidence (No path to founder)
+    // Case D: Target Investor Affiliation Evidence (Active in 2026, but zero path to founder)
     {
       id: "ev-isabel-aurora-website",
       relationshipId: "rel-isabel-aurora",
       type: "company_website",
-      description: "Isabel Torres listed as Managing Partner at Aurora Global Ventures",
-      observedAt: "2024-09-01",
+      description: "Isabel Torres listed as Managing Partner at Aurora Global Ventures as of September 2026",
+      observedAt: "2026-09-01",
       sourceUrl: "https://aurora-global-example.com/team/isabel-torres",
       sourceName: "Aurora Global Ventures Website",
     },
@@ -394,7 +402,7 @@ export const pathwayDemoDataset: PathwayDataset = {
       founderPersonIds: ["person-founder-elena"],
       round: "Seed",
       status: "active",
-      createdAt: "2024-09-01T00:00:00Z",
+      createdAt: "2026-09-01T00:00:00Z",
     },
   ],
 
