@@ -3,6 +3,8 @@ import {
   RelationshipQualification,
   QualificationStatus,
   QualificationReasonCode,
+  RecencyBucket,
+  EvidenceSummary,
 } from "@/types/pathway";
 import { PathGenerationPolicy } from "./pathGenerationPolicy";
 import { isRelationshipTraversable, getPermittedTraversalSteps } from "./traversalPolicy";
@@ -14,6 +16,9 @@ export interface TraversalGraphEdge {
   traversedReverse: boolean;
   qualificationStatus: QualificationStatus;
   qualificationReasonCodes: QualificationReasonCode[];
+  qualificationRecency: RecencyBucket;
+  qualificationEvidenceSummary: EvidenceSummary;
+  latestRelevantInteractionAt?: string;
 }
 
 export type TraversalGraph = Map<string, TraversalGraphEdge[]>;
@@ -25,6 +30,7 @@ export type TraversalGraph = Map<string, TraversalGraphEdge[]>;
  * - Pure function, does not mutate inputs.
  * - Structural and organization edges are strictly omitted.
  * - Only qualified traversable relationships (eligible, or confirmation_required if permitted by policy) enter.
+ * - Propagates qualification snapshot metadata (recency, evidence summary, latest relevant interaction) for downstream scoring.
  * - Adjacency lists are sorted deterministically by stable fields (relationshipId, destinationPersonId, reverse flag).
  */
 export function buildTraversalGraph(
@@ -63,6 +69,9 @@ export function buildTraversalGraph(
         traversedReverse: step.traversedReverse,
         qualificationStatus: qual.status,
         qualificationReasonCodes: [...qual.reasonCodes],
+        qualificationRecency: qual.recency,
+        qualificationEvidenceSummary: { ...qual.evidenceSummary },
+        latestRelevantInteractionAt: qual.latestRelevantInteractionAt,
       };
 
       const existingEdges = graph.get(step.fromPersonId);

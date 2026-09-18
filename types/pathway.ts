@@ -5,13 +5,14 @@
  * Batch 2 — Deterministic Relationship Qualification
  * Batch 3 — Deterministic Path Generation & Traversal Engine
  * Batch 4 — Deterministic Path Rejection & Viability Filter
+ * Batch 5 — Deterministic Path Scoring & Priority Index
  *
  * Core Principle:
  * DATA -> EVIDENCE -> DECISION -> ACTION -> OUTCOME -> LEARNING
  *
  * This layer represents raw facts, observed evidence, deterministic
- * relationship qualification, deterministic path generation, and deterministic path rejection.
- * It does NOT score relationships, assess warmth, perform path ranking, or select target people.
+ * relationship qualification, path generation, path rejection, and path scoring.
+ * It does NOT perform target-person selection, choose a recommended path, or train a probability or learned model.
  */
 
 export interface EntityReference {
@@ -166,6 +167,9 @@ export interface PathTraversalStep {
   traversedReverse: boolean;
   qualificationStatus: QualificationStatus;
   qualificationReasonCodes: QualificationReasonCode[];
+  qualificationRecency: RecencyBucket;
+  qualificationEvidenceSummary: EvidenceSummary;
+  latestRelevantInteractionAt?: string;
 }
 
 export interface PathCandidate {
@@ -269,13 +273,60 @@ export interface PathRejectionResult {
   errors: string[];
 }
 
+export type PathScoreCalibrationStatus = "uncalibrated_heuristic";
+
+export interface PathStepScore {
+  relationshipId: string;
+  relationshipCredibility: number;
+  temporalFreshness: number;
+  qualificationStatus: QualificationStatus;
+  qualificationRecency: RecencyBucket;
+  qualificationReasonCodes: QualificationReasonCode[];
+  explanation: string;
+}
+
 export interface PathScore {
-  overall?: number;
-  relationshipStrength?: number;
-  relevance?: number;
-  confidence?: number;
-  recency?: number;
-  friction?: number;
+  pathId: string;
+  overallPriorityIndex: number;
+  relationshipCredibility: number;
+  temporalFreshness: number;
+  confirmationReadiness: number;
+  pathEfficiency: number;
+  confirmationRequiredHopCount: number;
+  relationshipHopCount: number;
+  bottleneckRelationshipId?: string;
+  stepScores: PathStepScore[];
+  calibrationStatus: PathScoreCalibrationStatus;
+  isProbability: false;
+  explanation: string;
+}
+
+export type PathScoringExecutionStatus =
+  | "success"
+  | "upstream_error"
+  | "error";
+
+export type PathScoringDisposition =
+  | "scores_available"
+  | "no_retained_paths"
+  | "upstream_paths_filtered"
+  | "upstream_error"
+  | "error";
+
+export interface ScoredPath {
+  path: PathCandidate;
+  score: PathScore;
+}
+
+export interface PathScoringResult {
+  executionStatus: PathScoringExecutionStatus;
+  targetInvestorId: string;
+  upstreamRejectionDisposition: PathRejectionDisposition | null;
+  inputRetainedPathCount: number;
+  scoredPaths: ScoredPath[];
+  disposition: PathScoringDisposition;
+  calibrationStatus: PathScoreCalibrationStatus;
+  errors: string[];
 }
 
 export type PathOutcomeType =

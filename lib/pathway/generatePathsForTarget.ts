@@ -367,6 +367,9 @@ export function generatePathsForTarget(
           traversedReverse: edge.traversedReverse,
           qualificationStatus: edge.qualificationStatus,
           qualificationReasonCodes: [...edge.qualificationReasonCodes],
+          qualificationRecency: edge.qualificationRecency,
+          qualificationEvidenceSummary: { ...edge.qualificationEvidenceSummary },
+          latestRelevantInteractionAt: edge.latestRelevantInteractionAt,
         };
 
         const updatedSteps = [...state.steps, nextStep];

@@ -38,6 +38,16 @@ $$\mathbf{RETAINED} \neq \mathbf{RECOMMENDED}$$
 
 $$\mathbf{ALL\ PATHS\ REJECTED} \neq \mathbf{COLD\ OUTREACH\ REQUIRED}$$
 
+$$\mathbf{SCORE} \neq \mathbf{PROBABILITY}$$
+
+$$\mathbf{SCORING} \neq \mathbf{RECOMMENDATION}$$
+
+$$\mathbf{SCORING} \neq \mathbf{TARGET\ PERSON\ SELECTION}$$
+
+$$\mathbf{REJECTED\ PATHS} \neq \mathbf{SCOREABLE\ PATHS}$$
+
+$$\mathbf{WEAKEST\ LINK\ MATTERS}$$
+
 1. **Network Visibility $\neq$ Introduction Credibility**: A weak tie or social graph connection may establish proximity, but Arcstone requires verifiable interaction or corroborated evidence before considering a relationship credible for a fundraising introduction.
 2. **Observation Time $\neq$ Interaction Time**: The time Arcstone observes or ingests an evidence artifact (`observedAt`) is strictly decoupled from the time the human interaction occurred (`interaction.occurredAt`).
 3. **Outreach $\neq$ Reciprocal Relationship**: One-way outbound outreach (e.g. unreplied email) does not constitute a reciprocal relationship and cannot qualify as introduction-eligible.
@@ -50,10 +60,15 @@ $$\mathbf{ALL\ PATHS\ REJECTED} \neq \mathbf{COLD\ OUTREACH\ REQUIRED}$$
 10. **Rejection $\neq$ Ranking**: Path Rejection applies pass/fail viability bounds without computing scores or ranking surviving routes.
 11. **Retained $\neq$ Recommended**: Retained paths merely survive viability filters; recommendation decisions occur in subsequent pipeline stages.
 12. **All Paths Rejected $\neq$ Cold Outreach Required**: Rejection evaluates candidate path viability; it does not decide outreach strategy.
+13. **Score $\neq$ Probability**: Numeric priority scores are uncalibrated heuristics. An 82/100 index is not an 82% probability of introduction, meeting, or investment.
+14. **Scoring $\neq$ Recommendation**: Path Scoring computes component scores and a priority index for retained paths. It does not select winners or recommend outreach.
+15. **Scoring $\neq$ Target Person Selection**: Scoring evaluates route quality, not which decision-maker to target inside an investor organization.
+16. **Rejected Paths $\neq$ Scoreable Paths**: Paths rejected by Path Rejection receive no score.
+17. **Weakest Link Matters**: Path-level credibility and freshness are governed by the minimum component score across all steps in the path.
 
 ## Current status
 
-Batch 4 — Deterministic Path Rejection / Viability Filter operational.
+Batch 5 — Deterministic Path Scoring / Priority Index operational.
 
 ## Graph Semantics & Path Traversal
 
@@ -63,6 +78,7 @@ Batch 4 — Deterministic Path Rejection / Viability Filter operational.
 * **Target Candidate Affiliation Verification**: Candidates must be verifiably affiliated via `currentOrganizationIds` or a structural `works_at` edge. Unverified affiliations fail closed.
 * **Deterministic Bounded BFS**: Explores all simple paths from each founder to candidate target people up to `maxRelationshipHops` (default 3), eliminating cycles.
 * **Deterministic Path Rejection**: Filters generated candidates based on hard data-quality rules (one-way outreach, invalid/future interaction dates) and compounding uncertainty limits (`maxConfirmationRequiredHops`).
+* **Deterministic Path Scoring**: Computes four component scores (Relationship Credibility, Temporal Freshness, Confirmation Readiness, Path Efficiency) and a weighted overall Priority Index for retained paths using the weakest-link principle.
 * **Primary Fixture Negative Control**: Primary demonstration network strictly isolates Case D (Aurora Global Ventures / Isabel Torres) with zero non-structural edges, ensuring an absolute negative control for Path Generation.
 * **Referential Consistency**: Relationships and evidence are strictly bound with bidirectional referential integrity, preventing dangling or misattributed citations.
 
@@ -85,7 +101,7 @@ Path Generation [IMPLEMENTED]
       ↓
 Path Rejection [IMPLEMENTED]
       ↓
-Path Scoring [PLANNED]
+Path Scoring [IMPLEMENTED]
       ↓
 Target Person Selection [PLANNED]
       ↓

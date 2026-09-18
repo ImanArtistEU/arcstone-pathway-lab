@@ -3,6 +3,7 @@ import { assertDatasetIntegrity } from "@/lib/pathway/assertDatasetIntegrity";
 import { qualifyRelationships } from "@/lib/pathway/qualifyRelationships";
 import { generatePathsForTarget } from "@/lib/pathway/generatePathsForTarget";
 import { applyPathRejection } from "@/lib/pathway/applyPathRejection";
+import { scoreRetainedPaths } from "@/lib/pathway/scoreRetainedPaths";
 
 export default function HomePage() {
   const integrity = assertDatasetIntegrity(pathwayDemoDataset);
@@ -20,11 +21,13 @@ export default function HomePage() {
     const orgName = orgMap.get(target.investorOrganizationId) || target.investorOrganizationId;
     const generationResult = generatePathsForTarget(pathwayDemoDataset, target.id, "2026-09-18");
     const rejectionResult = applyPathRejection(generationResult);
+    const scoringResult = scoreRetainedPaths(rejectionResult);
     return {
       targetId: target.id,
       orgName,
       generationResult,
       rejectionResult,
+      scoringResult,
     };
   });
 
@@ -39,7 +42,7 @@ export default function HomePage() {
         </p>
 
         <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 mb-6">
-          Batch 4 — Path rejection operational
+          Batch 5 — Path scoring operational
         </div>
 
         {/* Dataset Counts */}
@@ -101,12 +104,12 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Path Rejection Results */}
+        {/* Path Scoring Results */}
         <div className="border-t border-gray-100 pt-5 text-left mb-5 space-y-3">
           <span className="text-xs uppercase tracking-wider text-gray-500 font-medium block mb-2">
-            Path Rejection by Target
+            Path Scoring by Target
           </span>
-          {targets.map(({ targetId, orgName, generationResult, rejectionResult }) => {
+          {targets.map(({ targetId, orgName, generationResult, rejectionResult, scoringResult }) => {
             const allEvaluated = [
               ...rejectionResult.retainedPaths,
               ...rejectionResult.rejectedPaths,
@@ -125,7 +128,7 @@ export default function HomePage() {
                     GENERATED: {rejectionResult.inputPathCount} | RETAINED: {rejectionResult.retainedPaths.length} | REJECTED: {rejectionResult.rejectedPathCount}
                   </span>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {allEvaluated.length > 0 ? (
                     allEvaluated.map((p) => {
                       const evalRecord = rejectionResult.evaluations.find(
@@ -134,11 +137,15 @@ export default function HomePage() {
                       const isRetained = evalRecord?.decision === "retain";
                       const isEligible = p.status === "eligible";
 
+                      const scoredPathObj = scoringResult.scoredPaths.find(
+                        (sp) => sp.path.id === p.id
+                      );
+
                       const statusBadgeText = isRetained
                         ? isEligible
                           ? "RETAINED"
                           : "RETAINED — CONFIRMATION REQUIRED"
-                        : `REJECTED — ${evalRecord?.reasonCodes.join(", ")}`;
+                        : "REJECTED";
 
                       const statusBadgeClass = isRetained
                         ? isEligible
@@ -149,9 +156,9 @@ export default function HomePage() {
                       return (
                         <div
                           key={p.id}
-                          className="flex flex-col text-xs font-mono p-1.5 bg-white rounded border border-gray-100 space-y-1"
+                          className="flex flex-col text-xs font-mono p-2 bg-white rounded border border-gray-100 space-y-2"
                         >
-                          <div className="text-gray-800">
+                          <div className="text-gray-800 font-medium">
                             {p.nodes
                               .map((n) => personMap.get(n.id) || n.id)
                               .join(" → ")}
@@ -163,16 +170,43 @@ export default function HomePage() {
                               {statusBadgeText}
                             </span>
                           </div>
+
+                          {isRetained && scoredPathObj ? (
+                            <div className="pt-1.5 border-t border-gray-100 space-y-1 text-gray-700">
+                              <div className="flex justify-between items-center text-sm font-bold text-gray-900">
+                                <span>Priority Index:</span>
+                                <span>{scoredPathObj.score.overallPriorityIndex} / 100</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
+                                <div>Credibility: {scoredPathObj.score.relationshipCredibility}</div>
+                                <div>Freshness: {scoredPathObj.score.temporalFreshness}</div>
+                                <div>Confirmation: {scoredPathObj.score.confirmationReadiness}</div>
+                                <div>Efficiency: {scoredPathObj.score.pathEfficiency}</div>
+                              </div>
+                              <div className="text-[10px] text-amber-700 bg-amber-50/70 p-1 rounded font-sans font-semibold mt-1">
+                                UNCALIBRATED HEURISTIC — NOT A PROBABILITY
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-gray-500 italic pt-1 border-t border-gray-100">
+                              NOT SCORED
+                            </div>
+                          )}
                         </div>
                       );
                     })
                   ) : (
-                    <div className="text-xs text-gray-500 font-mono italic">
-                      {generationResult.executionStatus === "error"
-                        ? "Upstream generation error"
-                        : rejectionResult.disposition === "upstream_paths_filtered"
-                        ? "Confirmation paths filtered upstream"
-                        : "NO GENERATED PATH"}
+                    <div className="text-xs text-gray-500 font-mono italic p-2 bg-white rounded border border-gray-100">
+                      <div>
+                        {generationResult.executionStatus === "error"
+                          ? "Upstream generation error"
+                          : rejectionResult.disposition === "upstream_paths_filtered"
+                          ? "Confirmation paths filtered upstream"
+                          : "NO GENERATED PATH"}
+                      </div>
+                      <div className="text-[11px] text-gray-500 italic pt-1 mt-1 border-t border-gray-100">
+                        NOT SCORED
+                      </div>
                     </div>
                   )}
                 </div>
