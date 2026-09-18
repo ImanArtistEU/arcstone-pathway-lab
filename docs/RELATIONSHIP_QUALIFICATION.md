@@ -120,7 +120,28 @@ Two investors appearing on the same portfolio page or press release proves co-in
 
 1. **`former_colleague` fallback**: `relationship.endedAt` may serve as a conservative fallback when explicit interaction records are absent. This fallback **never** qualifies an edge as `eligible`; it only differentiates `aging` from `stale`.
 2. **Future dates**: Purported interaction dates after `referenceDate` yield `status: confirmation_required`, `recency: unknown`, and reason code `FUTURE_INTERACTION_DATE`.
-3. **Invalid dates**: Unparseable date strings yield `status: confirmation_required`, `recency: unknown`, and reason code `INVALID_INTERACTION_DATE`.
+3. **Invalid interaction dates**: Unparseable date strings in `interaction.occurredAt` yield `status: confirmation_required`, `recency: unknown`, and reason code `INVALID_INTERACTION_DATE`.
+4. **Invalid reference evaluation date**: A valid `referenceDate` is strictly required for temporal qualification. Any non-structural relationship evaluated against an invalid or unparseable `referenceDate` deterministically yields `status: confirmation_required`, `recency: unknown`, and reason code `INVALID_REFERENCE_DATE`. It can never become eligible. Structural relationships remain `status: structural`.
+
+---
+
+## Qualification Reason Provenance
+
+In Batch 2.2, eligibility reason codes strictly reflect the actual evidence record that establishes the winning/latest qualifying confirmed two-way interaction:
+
+* If the winning confirmed two-way interaction comes from a `direct_interaction` record (`email_history`, `meeting_history`), the engine emits `RECENT_DIRECT_INTERACTION`.
+* If the winning confirmed two-way interaction comes from a `founder_asserted` record (`crm_history`, `user_reported`), the engine emits `RECENT_INTERNAL_EVIDENCE`.
+
+Reason assignment is **not** inferred from aggregate counts. For example, if a relationship has older or one-way emails alongside a fresh, confirmed two-way CRM advisory entry, the winning interaction is founder-asserted, correctly emitting `RECENT_INTERNAL_EVIDENCE` rather than `RECENT_DIRECT_INTERACTION`.
+
+---
+
+## Fixture Integrity & Case D Negative Control
+
+The primary demonstration dataset (`pathwayDemoDataset`) strictly isolates **Case D — No Known Path** (Aurora Global Ventures / Isabel Torres):
+* Founder Elena Vance has zero network ties or outreach edges to Isabel Torres or Aurora Global Ventures.
+* The only relationship involving Isabel in `pathwayDemoDataset` is her structural employment affiliation (`works_at` Aurora Global Ventures).
+* Outbound outreach edge cases (such as cold unreplied emails) are isolated in `data/fixtures/qualification-edge-cases.ts` to prevent contamination of Case D as a pure zero-path benchmark for future graph traversal.
 
 ---
 
@@ -141,6 +162,7 @@ Qualification decisions emit machine-readable reason codes alongside template ex
 | `UNCONFIRMED_INTERACTION` | Unconfirmed interaction record (e.g. unverified calendar invite). |
 | `FUTURE_INTERACTION_DATE` | Interaction date occurs in the future relative to reference date. |
 | `INVALID_INTERACTION_DATE` | Interaction date is malformed or unparseable. |
+| `INVALID_REFERENCE_DATE` | Reference evaluation date provided is invalid or unparseable. |
 | `AGING_INTERACTION` | Interaction observed between 366 and 730 days ago. |
 | `STALE_INTERACTION` | Interaction observed over 730 days ago. |
 | `NO_EVIDENCE` | Zero evidentiary records attached to relationship edge. |

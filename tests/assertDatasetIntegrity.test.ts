@@ -195,4 +195,167 @@ describe("Dataset Integrity Validator", () => {
       )
     ).toBe(true);
   });
+
+  it("I: fails when interaction metadata has missing or empty occurredAt", () => {
+    const brokenDataset: PathwayDataset = {
+      ...pathwayDemoDataset,
+      relationshipEvidence: pathwayDemoDataset.relationshipEvidence.map((ev) =>
+        ev.id === "ev-elena-marcus-meetings"
+          ? {
+              ...ev,
+              interaction: {
+                occurredAt: "   ",
+                reciprocity: "two_way",
+                status: "confirmed",
+              } as unknown as typeof ev.interaction,
+            }
+          : ev
+      ),
+    };
+
+    const result = assertDatasetIntegrity(brokenDataset);
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some((err) =>
+        err.includes('Evidence "ev-elena-marcus-meetings" contains interaction with missing or empty occurredAt.')
+      )
+    ).toBe(true);
+  });
+
+  it("J: fails when interaction metadata has invalid reciprocity runtime value", () => {
+    const brokenDataset: PathwayDataset = {
+      ...pathwayDemoDataset,
+      relationshipEvidence: pathwayDemoDataset.relationshipEvidence.map((ev) =>
+        ev.id === "ev-elena-marcus-meetings"
+          ? {
+              ...ev,
+              interaction: {
+                occurredAt: "2026-09-10",
+                reciprocity: "invalid_reciprocity_value" as unknown as "two_way",
+                status: "confirmed",
+              },
+            }
+          : ev
+      ),
+    };
+
+    const result = assertDatasetIntegrity(brokenDataset);
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some((err) =>
+        err.includes('contains interaction with invalid reciprocity "invalid_reciprocity_value"')
+      )
+    ).toBe(true);
+  });
+
+  it("K: fails when interaction metadata has invalid status runtime value", () => {
+    const brokenDataset: PathwayDataset = {
+      ...pathwayDemoDataset,
+      relationshipEvidence: pathwayDemoDataset.relationshipEvidence.map((ev) =>
+        ev.id === "ev-elena-marcus-meetings"
+          ? {
+              ...ev,
+              interaction: {
+                occurredAt: "2026-09-10",
+                reciprocity: "two_way",
+                status: "invalid_status_value" as unknown as "confirmed",
+              },
+            }
+          : ev
+      ),
+    };
+
+    const result = assertDatasetIntegrity(brokenDataset);
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some((err) =>
+        err.includes('contains interaction with invalid status "invalid_status_value"')
+      )
+    ).toBe(true);
+  });
+
+  it("L: fails when LinkedIn or public-context evidence contains interaction metadata", () => {
+    const brokenDataset: PathwayDataset = {
+      ...pathwayDemoDataset,
+      relationshipEvidence: pathwayDemoDataset.relationshipEvidence.map((ev) =>
+        ev.id === "ev-elena-david-linkedin"
+          ? {
+              ...ev,
+              interaction: {
+                occurredAt: "2026-09-10",
+                reciprocity: "two_way",
+                status: "confirmed",
+              },
+            }
+          : ev
+      ),
+    };
+
+    const result = assertDatasetIntegrity(brokenDataset);
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some((err) =>
+        err.includes('cannot carry interaction metadata. Interaction metadata is only permitted on direct_interaction or founder_asserted evidence.')
+      )
+    ).toBe(true);
+  });
+
+  it("M: passes validation on valid confirmed two-way email interaction", () => {
+    const validDataset: PathwayDataset = {
+      ...pathwayDemoDataset,
+      relationshipEvidence: pathwayDemoDataset.relationshipEvidence.map((ev) =>
+        ev.id === "ev-marcus-sarah-email"
+          ? {
+              ...ev,
+              interaction: {
+                occurredAt: "2026-08-20",
+                reciprocity: "two_way",
+                status: "confirmed",
+              },
+            }
+          : ev
+      ),
+    };
+
+    const result = assertDatasetIntegrity(validDataset);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("Case D Fixture Contract: primary demo Case D (Isabel / Aurora) remains an isolated zero-path control", () => {
+    // Assert required entities exist
+    const isabel = pathwayDemoDataset.people.find((p) => p.id === "person-vc-isabel");
+    const auroraOrg = pathwayDemoDataset.organizations.find((o) => o.id === "org-aurora-ventures");
+    const auroraTarget = pathwayDemoDataset.targetInvestors.find((t) => t.id === "target-aurora");
+
+    expect(isabel).toBeDefined();
+    expect(auroraOrg).toBeDefined();
+    expect(auroraTarget).toBeDefined();
+
+    // Assert structural works_at relationship exists
+    const isabelAffiliation = pathwayDemoDataset.relationships.find(
+      (r) =>
+        r.id === "rel-isabel-aurora" &&
+        r.from.id === "person-vc-isabel" &&
+        r.to.id === "org-aurora-ventures" &&
+        r.type === "works_at"
+    );
+    expect(isabelAffiliation).toBeDefined();
+
+    // Assert NO non-structural relationship involving Isabel exists in pathwayDemoDataset
+    const nonStructuralIsabelRels = pathwayDemoDataset.relationships.filter(
+      (r) =>
+        (r.from.id === "person-vc-isabel" || r.to.id === "person-vc-isabel") &&
+        r.type !== "works_at"
+    );
+    expect(nonStructuralIsabelRels).toEqual([]);
+
+    // Assert NO direct relationship between Elena and Isabel exists
+    const directElenaIsabelRels = pathwayDemoDataset.relationships.filter(
+      (r) =>
+        (r.from.id === "person-founder-elena" && r.to.id === "person-vc-isabel") ||
+        (r.from.id === "person-vc-isabel" && r.to.id === "person-founder-elena")
+    );
+    expect(directElenaIsabelRels).toEqual([]);
+  });
 });

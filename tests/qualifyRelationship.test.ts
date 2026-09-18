@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { pathwayDemoDataset } from "@/data/fixtures/pathway-demo";
+import {
+  oneWayOutboundRelationship,
+  oneWayOutboundEvidence,
+} from "@/data/fixtures/qualification-edge-cases";
 import { qualifyRelationship } from "@/lib/pathway/qualifyRelationship";
 import { Relationship, RelationshipEvidence } from "@/types/pathway";
 
@@ -468,13 +472,138 @@ describe("Deterministic Relationship Qualification Engine", () => {
     expect(result.reasonCodes).toContain("RECENT_DIRECT_INTERACTION");
   });
 
-  it("23: Synthetic fixture outbound-only relationship rel-elena-isabel-outbound qualifies as confirmation_required with ONE_WAY_OUTREACH_ONLY", () => {
-    const rel = getFixtureRel("rel-elena-isabel-outbound");
-    const ev = getFixtureEvidence(rel.evidenceIds);
-    const result = qualifyRelationship(rel, ev, REFERENCE_DATE);
+  it("23: Isolated synthetic fixture outbound-only relationship qualifies as confirmation_required with ONE_WAY_OUTREACH_ONLY", () => {
+    const result = qualifyRelationship(
+      oneWayOutboundRelationship,
+      [oneWayOutboundEvidence],
+      REFERENCE_DATE
+    );
 
     expect(result.status).toBe("confirmation_required");
     expect(result.reasonCodes).toContain("ONE_WAY_OUTREACH_ONLY");
     expect(result.status).not.toBe("eligible");
+  });
+
+  it("24: Invalid string referenceDate causes non-structural relationship to return confirmation_required with INVALID_REFERENCE_DATE", () => {
+    const rel = getFixtureRel("rel-elena-marcus");
+    const ev = getFixtureEvidence(rel.evidenceIds);
+    const result = qualifyRelationship(rel, ev, "not-a-valid-date");
+
+    expect(result.status).toBe("confirmation_required");
+    expect(result.recency).toBe("unknown");
+    expect(result.reasonCodes).toContain("INVALID_REFERENCE_DATE");
+    expect(result.status).not.toBe("eligible");
+  });
+
+  it("25: Invalid Date object referenceDate causes non-structural relationship to return confirmation_required with INVALID_REFERENCE_DATE", () => {
+    const rel = getFixtureRel("rel-elena-marcus");
+    const ev = getFixtureEvidence(rel.evidenceIds);
+    const result = qualifyRelationship(rel, ev, new Date("invalid-date-string"));
+
+    expect(result.status).toBe("confirmation_required");
+    expect(result.recency).toBe("unknown");
+    expect(result.reasonCodes).toContain("INVALID_REFERENCE_DATE");
+    expect(result.status).not.toBe("eligible");
+  });
+
+  it("26: Invalid referenceDate does NOT affect structural relationships (they remain structural)", () => {
+    const rel = getFixtureRel("rel-sarah-horizon");
+    const ev = getFixtureEvidence(rel.evidenceIds);
+    const result = qualifyRelationship(rel, ev, "completely-invalid-date");
+
+    expect(result.status).toBe("structural");
+    expect(result.relationshipClass).toBe("structural");
+    expect(result.reasonCodes).toContain("STRUCTURAL_RELATIONSHIP");
+  });
+
+  it("27: Reason provenance: relationship with older/one-way email but recent confirmed founder-asserted interaction uses RECENT_INTERNAL_EVIDENCE", () => {
+    const testRel: Relationship = {
+      id: "rel-test-provenance-internal",
+      from: { type: "person", id: "person-a" },
+      to: { type: "person", id: "person-b" },
+      type: "advisor",
+      direction: "directed",
+      evidenceIds: ["ev-older-email", "ev-recent-crm"],
+    };
+
+    const ev: RelationshipEvidence[] = [
+      {
+        id: "ev-older-email",
+        relationshipId: testRel.id,
+        type: "email_history",
+        description: "Older email thread from 2025",
+        observedAt: "2025-06-01",
+        interaction: {
+          occurredAt: "2025-05-15",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
+      },
+      {
+        id: "ev-recent-crm",
+        relationshipId: testRel.id,
+        type: "crm_history",
+        description: "Recent advisory sync recorded in founder CRM",
+        observedAt: "2026-09-10",
+        interaction: {
+          occurredAt: "2026-09-08",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
+      },
+    ];
+
+    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
+
+    expect(result.status).toBe("eligible");
+    expect(result.recency).toBe("recent");
+    // Must be RECENT_INTERNAL_EVIDENCE because the winning interaction is founder_asserted
+    expect(result.reasonCodes).toEqual(["RECENT_INTERNAL_EVIDENCE"]);
+    expect(result.reasonCodes).not.toContain("RECENT_DIRECT_INTERACTION");
+  });
+
+  it("28: Reason provenance: relationship with older founder-asserted interaction but recent email_history uses RECENT_DIRECT_INTERACTION", () => {
+    const testRel: Relationship = {
+      id: "rel-test-provenance-direct",
+      from: { type: "person", id: "person-a" },
+      to: { type: "person", id: "person-b" },
+      type: "advisor",
+      direction: "directed",
+      evidenceIds: ["ev-older-crm", "ev-recent-email"],
+    };
+
+    const ev: RelationshipEvidence[] = [
+      {
+        id: "ev-older-crm",
+        relationshipId: testRel.id,
+        type: "crm_history",
+        description: "Older sync logged in CRM",
+        observedAt: "2025-06-01",
+        interaction: {
+          occurredAt: "2025-05-15",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
+      },
+      {
+        id: "ev-recent-email",
+        relationshipId: testRel.id,
+        type: "email_history",
+        description: "Recent confirmed email coordination",
+        observedAt: "2026-09-10",
+        interaction: {
+          occurredAt: "2026-09-08",
+          reciprocity: "two_way",
+          status: "confirmed",
+        },
+      },
+    ];
+
+    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
+
+    expect(result.status).toBe("eligible");
+    expect(result.recency).toBe("recent");
+    expect(result.reasonCodes).toEqual(["RECENT_DIRECT_INTERACTION"]);
+    expect(result.reasonCodes).not.toContain("RECENT_INTERNAL_EVIDENCE");
   });
 });

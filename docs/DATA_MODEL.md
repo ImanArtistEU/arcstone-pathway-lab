@@ -48,7 +48,34 @@ A visible LinkedIn connection is a raw observational signal, not proof of a warm
 * By representing LinkedIn links purely as raw relationships supported by `linkedin` evidence, downstream qualification engines can cleanly distinguish superficial connections from high-conviction, evidence-backed routes.
 * **Recency does not equal strength**: Even a freshly observed 2026 LinkedIn connection remains a weak edge without corroborating interaction evidence.
 
-### 3. Semantic Direction vs. Traversal Permission
+### 3. Interaction Evidence Semantics (`observedAt` vs. `interaction.occurredAt`)
+
+A major architectural invariant established in Batch 2.1 and finalized in Batch 2.2 is the separation of ingestion metadata from real-world human interactions:
+
+$$\text{OBSERVATION TIME} \neq \text{INTERACTION TIME}$$
+
+* **`RelationshipEvidence.observedAt`**: The timestamp when Arcstone ingested or observed the evidence record.
+* **`RelationshipEvidence.interaction`**: An optional structured payload (`InteractionEvidenceDetails`) recording human communication facts:
+  * **`occurredAt`**: Required non-empty ISO date string of when the actual human interaction took place.
+  * **`reciprocity`**:
+    * `"two_way"`: Two-way mutual communication (e.g. exchanged emails, attended meetings).
+    * `"one_way"`: One-way outbound attempt (e.g. cold pitch email, unanswered outreach).
+    * `"unknown"`: Communication direction cannot be verified from raw record.
+  * **`status`**:
+    * `"confirmed"`: Verified completed interaction.
+    * `"unconfirmed"`: Pending or unverified interaction (e.g. calendar invite without proof of attendance).
+
+#### Why `email_history` Alone Does Not Imply a Reciprocal Relationship
+
+An outbound unreplied email is `email_history`, but it represents `reciprocity: "one_way"`. In a fundraising workflow, an unanswered outbound pitch does not establish an introduction pathway; treating it as a warm tie risks damaging outreach and reputational harm. Therefore, outbound outreach alone results in `confirmation_required` with `ONE_WAY_OUTREACH_ONLY`.
+
+#### Interaction Metadata Category Restrictions
+
+To prevent semantic smuggling, interaction metadata is permitted ONLY on evidence categories capable of carrying assertions about human communication:
+* **Allowed**: `direct_interaction` (`email_history`, `meeting_history`) and `founder_asserted` (`crm_history`, `user_reported`).
+* **Forbidden**: `public_context` (`company_website`, `press_release`, `news_article`, `portfolio_page`, `event_page`) and `platform_signal` (`linkedin`). A static LinkedIn link or public webpage cannot carry synthetic interaction metadata. This invariant is strictly enforced by `assertDatasetIntegrity`.
+
+### 4. Semantic Direction vs. Traversal Permission
 
 `Relationship.from` and `Relationship.to` describe the **semantic orientation** of the observed relationship, and `Relationship.direction` defines whether the underlying real-world relationship is intrinsically directional or symmetric.
 
@@ -68,14 +95,14 @@ Canonical semantic orientation conventions:
 * `co_invested`: Person/Organization $\leftrightarrow$ Person/Organization (`bidirectional`)
 * `known_personally`: Person $\leftrightarrow$ Person (`bidirectional`)
 
-### 4. Early Definition of `PathCandidate` and `PathScore` Without Premature Generation
+### 5. Early Definition of `PathCandidate` and `PathScore` Without Premature Generation
 
 `PathCandidate` and `PathScore` contracts are declared in Batch 1 to establish the target interface boundary without coupling to any heuristic or scoring formula.
 
 * Prevents premature architectural assumptions about graph traversal or path ranking.
 * Enables strict contract testing and ensures the data pipeline will consume well-typed inputs and emit standardized candidate structures.
 
-### 5. Closing the Learning Loop via Outcomes and Feedback
+### 6. Closing the Learning Loop via Outcomes and Feedback
 
 The system is designed to learn from ground-truth results rather than static assumptions:
 

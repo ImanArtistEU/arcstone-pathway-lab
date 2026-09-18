@@ -32,7 +32,6 @@ export default function HomePage() {
   const marcusSarah = formatStatus(qualMap.get("rel-marcus-sarah")?.status);
   const elenaDavid = formatStatus(qualMap.get("rel-elena-david")?.status);
   const elenaTom = formatStatus(qualMap.get("rel-elena-tom")?.status);
-  const elenaIsabel = formatStatus(qualMap.get("rel-elena-isabel-outbound")?.status);
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-gray-50">
@@ -45,7 +44,7 @@ export default function HomePage() {
         </p>
 
         <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 mb-6">
-          Batch 2.1 — Interaction evidence hardening operational
+          Batch 2.2 — Qualification contract operational
         </div>
 
         {/* Dataset Counts */}
@@ -124,13 +123,9 @@ export default function HomePage() {
             <span className="text-gray-700">Founder ↔ Beacon Partner (LinkedIn only):</span>
             <span className="font-semibold text-amber-600">{elenaDavid}</span>
           </div>
-          <div className="flex justify-between items-center py-1 border-b border-gray-50">
+          <div className="flex justify-between items-center py-1">
             <span className="text-gray-700">Founder ↔ Former Colleague:</span>
             <span className="font-semibold text-amber-600">{elenaTom}</span>
-          </div>
-          <div className="flex justify-between items-center py-1">
-            <span className="text-gray-700">Founder → Investor (Unreplied email):</span>
-            <span className="font-semibold text-amber-600">{elenaIsabel}</span>
           </div>
         </div>
 

@@ -26,13 +26,18 @@ $$\mathbf{OUTREACH} \neq \mathbf{RECIPROCAL\ RELATIONSHIP}$$
 
 ## Current status
 
-Batch 2.1 — Interaction Evidence Hardening operational.
+Batch 2.2 — Qualification Contract Completion operational.
 
-## Graph Semantics
+## Graph Semantics & Qualification Contract
 
 * **Observed Semantic Facts**: Relationships store empirical facts rather than assumptions. `Relationship.from` and `Relationship.to` encode semantic direction (e.g., Advisor $\rightarrow$ Advised Person).
 * **Direction vs. Traversal Permission**: Semantic edge direction is distinct from graph traversal permission. The fact that Marcus advises Elena does not prevent Elena from reaching Marcus; traversal rules are governed by downstream engines.
-* **Relationship Qualification**: Evaluates introduction usability deterministically, distinguishing structural roles, verified interpersonal relationships, and raw network signals.
+* **Relationship Qualification Contract**: Evaluates introduction usability deterministically. Qualification requires:
+  1. Structural integrity and validated interaction metadata schema (`occurredAt`, `reciprocity`, `status`).
+  2. Interaction metadata restricted strictly to human interaction categories (`direct_interaction`, `founder_asserted`).
+  3. Valid reference evaluation date (`referenceDate`). Non-structural evaluations without a valid reference date yield `confirmation_required` with `INVALID_REFERENCE_DATE`.
+  4. Precise evidence provenance: reason codes (`RECENT_DIRECT_INTERACTION` vs `RECENT_INTERNAL_EVIDENCE`) reflect the specific winning evidence record rather than aggregate heuristics.
+* **Primary Fixture Negative Control**: Primary demonstration network strictly isolates Case D (Aurora Global Ventures / Isabel Torres) with zero non-structural edges, ensuring an absolute negative control for the future Path Generation engine. Edge cases (such as one-way unreplied emails) are isolated in separate test fixtures.
 * **Path Generation**: Future path search determines valid traversals from founder to candidate target investors.
 * **Referential Consistency**: Relationships and evidence are strictly bound with bidirectional referential integrity, preventing dangling or misattributed citations.
 

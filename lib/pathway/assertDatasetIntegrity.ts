@@ -1,4 +1,5 @@
 import { PathwayDataset, Relationship, RelationshipEvidence } from "@/types/pathway";
+import { classifyEvidenceType } from "./qualificationPolicy";
 
 export interface DatasetIntegrityResult {
   valid: boolean;
@@ -146,9 +147,10 @@ export function assertDatasetIntegrity(
     }
   }
 
-  // 2. Evidence relationship references and inverse linkage:
+  // 2. Evidence relationship references, inverse linkage, and interaction validation:
   // 1. relationshipId must exist
   // 2. The referenced Relationship's evidenceIds must include this evidence ID
+  // 3. If interaction metadata exists, validate its schema and allowable evidence category
   for (const ev of dataset.relationshipEvidence) {
     const rel = relationshipMap.get(ev.relationshipId);
     if (!rel) {
@@ -159,6 +161,51 @@ export function assertDatasetIntegrity(
       errors.push(
         `Evidence "${ev.id}" points to relationship "${ev.relationshipId}", but relationship "${ev.relationshipId}" does not list evidence "${ev.id}" in its evidenceIds.`
       );
+    }
+
+    // Validate interaction metadata if present
+    if (ev.interaction !== undefined && ev.interaction !== null) {
+      const interaction = ev.interaction as unknown as Record<string, unknown>;
+
+      // Check occurredAt is non-empty string
+      if (
+        typeof interaction.occurredAt !== "string" ||
+        interaction.occurredAt.trim().length === 0
+      ) {
+        errors.push(
+          `Evidence "${ev.id}" contains interaction with missing or empty occurredAt.`
+        );
+      }
+
+      // Check reciprocity is valid
+      const validReciprocities = ["two_way", "one_way", "unknown"];
+      if (
+        typeof interaction.reciprocity !== "string" ||
+        !validReciprocities.includes(interaction.reciprocity)
+      ) {
+        errors.push(
+          `Evidence "${ev.id}" contains interaction with invalid reciprocity "${interaction.reciprocity}". Must be one of: two_way, one_way, unknown.`
+        );
+      }
+
+      // Check status is valid
+      const validStatuses = ["confirmed", "unconfirmed"];
+      if (
+        typeof interaction.status !== "string" ||
+        !validStatuses.includes(interaction.status)
+      ) {
+        errors.push(
+          `Evidence "${ev.id}" contains interaction with invalid status "${interaction.status}". Must be one of: confirmed, unconfirmed.`
+        );
+      }
+
+      // Semantic invariant: interaction metadata allowed only on direct_interaction and founder_asserted
+      const category = classifyEvidenceType(ev.type);
+      if (category !== "direct_interaction" && category !== "founder_asserted") {
+        errors.push(
+          `Evidence "${ev.id}" of type "${ev.type}" (${category}) cannot carry interaction metadata. Interaction metadata is only permitted on direct_interaction or founder_asserted evidence.`
+        );
+      }
     }
   }
 

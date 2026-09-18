@@ -271,17 +271,6 @@ export const pathwayDemoDataset: PathwayDataset = {
       startedAt: "2019-04-01",
       lastObservedAt: "2026-09-01",
     },
-    // Outbound Outreach Example (Batch 2.1): Founder Elena -> VC Partner Isabel (unreplied outbound email)
-    {
-      id: "rel-elena-isabel-outbound",
-      from: { type: "person", id: "person-founder-elena" },
-      to: { type: "person", id: "person-vc-isabel" },
-      type: "other",
-      direction: "directed",
-      evidenceIds: ["ev-elena-isabel-outbound"],
-      startedAt: "2026-09-14",
-      lastObservedAt: "2026-09-15",
-    },
   ],
 
   relationshipEvidence: [
@@ -430,20 +419,6 @@ export const pathwayDemoDataset: PathwayDataset = {
       observedAt: "2026-09-01",
       sourceUrl: "https://aurora-global-example.com/team/isabel-torres",
       sourceName: "Aurora Global Ventures Website",
-    },
-    // Outbound Outreach Evidence (Batch 2.1): Confirmed one-way outbound pitch email
-    {
-      id: "ev-elena-isabel-outbound",
-      relationshipId: "rel-elena-isabel-outbound",
-      type: "email_history",
-      description: "Synthetic test fixture: Founder Elena Vance sent cold pitch email to Isabel Torres with no reply received",
-      observedAt: "2026-09-15",
-      interaction: {
-        occurredAt: "2026-09-14",
-        reciprocity: "one_way",
-        status: "confirmed",
-      },
-      sourceName: "Founder Outbox Email Logs (Synthetic Fixture)",
     },
   ],
 

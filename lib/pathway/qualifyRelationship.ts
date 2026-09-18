@@ -5,6 +5,7 @@ import {
   EvidenceSummary,
   RecencyBucket,
   QualificationReasonCode,
+  EvidenceCategory,
 } from "@/types/pathway";
 import {
   QualificationPolicy,
@@ -15,9 +16,12 @@ import {
 
 /**
  * Validates temporal interaction dates.
- * Returns true if valid timestamp and not in future relative to referenceDate.
+ * Returns timestamp ms if valid, or null if unparseable.
  */
 function parseDateMs(dateStr: string): number | null {
+  if (typeof dateStr !== "string" || dateStr.trim().length === 0) {
+    return null;
+  }
   const ms = new Date(dateStr).getTime();
   return isNaN(ms) ? null : ms;
 }
@@ -34,7 +38,13 @@ function computeRecency(
     return "unknown";
   }
 
-  const refMs = new Date(referenceDate).getTime();
+  const refMs =
+    referenceDate instanceof Date
+      ? referenceDate.getTime()
+      : typeof referenceDate === "string" && referenceDate.trim().length > 0
+        ? new Date(referenceDate).getTime()
+        : NaN;
+
   const intMs = new Date(interactionDate).getTime();
 
   if (isNaN(refMs) || isNaN(intMs)) {
@@ -58,6 +68,13 @@ function computeRecency(
   return "stale";
 }
 
+interface QualifyingInteraction {
+  occurredAt: string;
+  evidenceId: string;
+  evidenceCategory: EvidenceCategory;
+  occurredAtMs: number;
+}
+
 /**
  * Deterministically qualifies a single Relationship for fundraising introduction usability.
  *
@@ -66,6 +83,10 @@ function computeRecency(
  *    observedAt is ingestion time; only interaction.occurredAt indicates human interaction.
  * 2. OUTREACH ≠ RECIPROCAL RELATIONSHIP
  *    One-way outreach (e.g. unreplied outbound email) does NOT qualify as eligible.
+ * 3. REFERENCE DATE VALIDITY
+ *    Non-structural relationships require a valid reference evaluation date.
+ * 4. REASON PROVENANCE
+ *    Eligibility reason codes reflect the specific evidence record that established the qualifying interaction.
  *
  * Pure function:
  * - No network calls
@@ -114,6 +135,7 @@ export function qualifyRelationship(
   }
 
   // 2. RULE A: STRUCTURAL EDGE
+  // Structural relationships establish organizational or role facts independent of temporal interaction recency
   if (relationshipClass === "structural") {
     return {
       relationshipId: relationship.id,
@@ -128,7 +150,29 @@ export function qualifyRelationship(
     };
   }
 
-  // 3. RULE B: NO EVIDENCE
+  // 3. REFERENCE DATE VALIDATION FOR NON-STRUCTURAL RELATIONSHIPS
+  const refMs =
+    referenceDate instanceof Date
+      ? referenceDate.getTime()
+      : typeof referenceDate === "string" && referenceDate.trim().length > 0
+        ? new Date(referenceDate).getTime()
+        : NaN;
+
+  if (isNaN(refMs)) {
+    return {
+      relationshipId: relationship.id,
+      relationshipClass,
+      status: "confirmation_required",
+      recency: "unknown",
+      latestRelevantInteractionAt: undefined,
+      evidenceSummary,
+      reasonCodes: ["INVALID_REFERENCE_DATE"],
+      explanation:
+        "The reference evaluation date provided is invalid or unparseable.",
+    };
+  }
+
+  // 4. RULE B: NO EVIDENCE
   if (evidenceSummary.total === 0) {
     return {
       relationshipId: relationship.id,
@@ -143,9 +187,7 @@ export function qualifyRelationship(
     };
   }
 
-  // 4. TEMPORAL INTEGRITY CHECKS (Invalid or Future Dates)
-  const refMs = new Date(referenceDate).getTime();
-
+  // 5. TEMPORAL INTEGRITY CHECKS ON EVIDENCE (Invalid or Future Dates)
   for (const ev of evidenceList) {
     if (ev.interaction?.occurredAt) {
       const intMs = parseDateMs(ev.interaction.occurredAt);
@@ -178,7 +220,7 @@ export function qualifyRelationship(
     }
   }
 
-  // 5. RULE C: LINKEDIN ONLY
+  // 6. RULE C: LINKEDIN ONLY
   if (
     relationship.type === "linkedin_connection" &&
     evidenceSummary.platformSignal === evidenceSummary.total
@@ -196,7 +238,7 @@ export function qualifyRelationship(
     };
   }
 
-  // 6. ONE-WAY OUTREACH ONLY
+  // 7. ONE-WAY OUTREACH ONLY
   if (
     evidenceSummary.oneWayInteraction > 0 &&
     evidenceSummary.confirmedTwoWayInteraction === 0
@@ -221,7 +263,7 @@ export function qualifyRelationship(
     };
   }
 
-  // 7. UNCONFIRMED INTERACTION
+  // 8. UNCONFIRMED INTERACTION
   if (
     evidenceSummary.unconfirmedInteraction > 0 &&
     evidenceSummary.confirmedTwoWayInteraction === 0
@@ -239,8 +281,8 @@ export function qualifyRelationship(
     };
   }
 
-  // 8. RESOLVE LATEST CONFIRMED TWO-WAY INTERACTION DATE
-  const confirmedDates: string[] = [];
+  // 9. RESOLVE CONFIRMED TWO-WAY QUALIFYING INTERACTIONS WITH PROVENANCE
+  const qualifyingInteractions: QualifyingInteraction[] = [];
   for (const ev of evidenceList) {
     const cat = classifyEvidenceType(ev.type);
     if (
@@ -250,16 +292,39 @@ export function qualifyRelationship(
       ev.interaction.reciprocity === "two_way" &&
       ev.interaction.occurredAt
     ) {
-      confirmedDates.push(ev.interaction.occurredAt);
+      const ms = parseDateMs(ev.interaction.occurredAt);
+      if (ms !== null && ms <= refMs) {
+        qualifyingInteractions.push({
+          occurredAt: ev.interaction.occurredAt,
+          evidenceId: ev.id,
+          evidenceCategory: cat,
+          occurredAtMs: ms,
+        });
+      }
     }
   }
-  confirmedDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  const latestConfirmedInteractionAt = confirmedDates[0];
 
-  // 9. NETWORK SIGNAL EVALUATION
+  // Sort descending by occurrence date; tie-break direct_interaction over founder_asserted
+  qualifyingInteractions.sort((a, b) => {
+    if (b.occurredAtMs !== a.occurredAtMs) {
+      return b.occurredAtMs - a.occurredAtMs;
+    }
+    if (a.evidenceCategory === "direct_interaction" && b.evidenceCategory !== "direct_interaction") {
+      return -1;
+    }
+    if (b.evidenceCategory === "direct_interaction" && a.evidenceCategory !== "direct_interaction") {
+      return 1;
+    }
+    return 0;
+  });
+
+  const winningInteraction = qualifyingInteractions[0];
+  const latestConfirmedInteractionAt = winningInteraction?.occurredAt;
+
+  // 10. NETWORK SIGNAL EVALUATION
   if (relationshipClass === "network_signal") {
     // Network signal without confirmed two-way interaction
-    if (!latestConfirmedInteractionAt) {
+    if (!winningInteraction) {
       const reasonCodes: QualificationReasonCode[] =
         evidenceSummary.publicContext > 0
           ? ["PUBLIC_CONTEXT_ONLY", "NETWORK_SIGNAL_ONLY", "NO_DIRECT_INTERACTION"]
@@ -282,6 +347,11 @@ export function qualifyRelationship(
     const recency = computeRecency(latestConfirmedInteractionAt, referenceDate, policy);
 
     if (recency === "recent") {
+      const reasonCode: QualificationReasonCode =
+        winningInteraction.evidenceCategory === "direct_interaction"
+          ? "RECENT_DIRECT_INTERACTION"
+          : "RECENT_INTERNAL_EVIDENCE";
+
       return {
         relationshipId: relationship.id,
         relationshipClass: "network_signal",
@@ -289,9 +359,11 @@ export function qualifyRelationship(
         recency,
         latestRelevantInteractionAt: latestConfirmedInteractionAt,
         evidenceSummary,
-        reasonCodes: ["RECENT_DIRECT_INTERACTION"],
+        reasonCodes: [reasonCode],
         explanation:
-          "Network relationship is corroborated by recent confirmed two-way interaction records.",
+          reasonCode === "RECENT_DIRECT_INTERACTION"
+            ? "Network relationship is corroborated by recent confirmed two-way direct interaction records."
+            : "Network relationship is corroborated by recent confirmed founder-asserted interaction records.",
       };
     }
 
@@ -322,8 +394,8 @@ export function qualifyRelationship(
     };
   }
 
-  // 10. INTERPERSONAL RELATIONSHIPS (advisor, mentor, colleague, former_colleague, etc.)
-  if (latestConfirmedInteractionAt) {
+  // 11. INTERPERSONAL RELATIONSHIPS (advisor, mentor, colleague, former_colleague, etc.)
+  if (winningInteraction) {
     const recency = computeRecency(latestConfirmedInteractionAt, referenceDate, policy);
 
     if (recency === "stale") {
@@ -355,8 +427,9 @@ export function qualifyRelationship(
     }
 
     // recency === "recent"
+    // Use the actual provenance of the winning interaction record
     const reasonCode: QualificationReasonCode =
-      evidenceSummary.directInteraction > 0
+      winningInteraction.evidenceCategory === "direct_interaction"
         ? "RECENT_DIRECT_INTERACTION"
         : "RECENT_INTERNAL_EVIDENCE";
 
@@ -375,7 +448,7 @@ export function qualifyRelationship(
     };
   }
 
-  // 11. HISTORICAL RELATIONSHIP FALLBACK (former_colleague endedAt fallback)
+  // 12. HISTORICAL RELATIONSHIP FALLBACK (former_colleague endedAt fallback)
   if (relationship.type === "former_colleague" && relationship.endedAt) {
     const fallbackRecency = computeRecency(relationship.endedAt, referenceDate, policy);
 
@@ -421,7 +494,7 @@ export function qualifyRelationship(
     };
   }
 
-  // 12. PUBLIC CONTEXT ONLY OR UNCORROBORATED INTERPERSONAL
+  // 13. PUBLIC CONTEXT ONLY OR UNCORROBORATED INTERPERSONAL
   if (evidenceSummary.publicContext > 0 && evidenceSummary.directInteraction === 0 && evidenceSummary.founderAsserted === 0) {
     return {
       relationshipId: relationship.id,
