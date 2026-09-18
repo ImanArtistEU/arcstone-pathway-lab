@@ -4,12 +4,13 @@
  * Batch 1 — Domain Model and Dataset Contract
  * Batch 2 — Deterministic Relationship Qualification
  * Batch 3 — Deterministic Path Generation & Traversal Engine
+ * Batch 4 — Deterministic Path Rejection & Viability Filter
  *
  * Core Principle:
  * DATA -> EVIDENCE -> DECISION -> ACTION -> OUTCOME -> LEARNING
  *
  * This layer represents raw facts, observed evidence, deterministic
- * relationship qualification, and deterministic person-to-person path generation.
+ * relationship qualification, deterministic path generation, and deterministic path rejection.
  * It does NOT score relationships, assess warmth, perform path ranking, or select target people.
  */
 
@@ -220,6 +221,52 @@ export interface PathGenerationResult {
   disposition: PathGenerationDisposition | null;
   coldOutreachRequired: boolean | null;
   errors: PathGenerationError[];
+}
+
+export type PathRejectionDecision = "retain" | "reject";
+
+export type PathRejectionReasonCode =
+  | "ONE_WAY_OUTREACH_EDGE"
+  | "INVALID_INTERACTION_DATA"
+  | "FUTURE_INTERACTION_DATA"
+  | "INVALID_REFERENCE_CONTEXT"
+  | "EXCESS_CONFIRMATION_HOPS";
+
+export interface PathRejectionEvaluation {
+  pathId: string;
+  decision: PathRejectionDecision;
+  originalPathStatus: "eligible" | "candidate";
+  reasonCodes: PathRejectionReasonCode[];
+  blockingRelationshipIds: string[];
+  explanation: string;
+}
+
+export type PathRejectionExecutionStatus =
+  | "success"
+  | "upstream_error"
+  | "error";
+
+export type PathRejectionDisposition =
+  | "retained_paths_available"
+  | "all_paths_rejected"
+  | "no_generated_paths"
+  | "upstream_error"
+  | "upstream_paths_filtered"
+  | "error";
+
+export interface PathRejectionResult {
+  executionStatus: PathRejectionExecutionStatus;
+  targetInvestorId: string;
+  upstreamGenerationDisposition: PathGenerationDisposition | null;
+  inputPathCount: number;
+  retainedPaths: PathCandidate[];
+  rejectedPaths: PathCandidate[];
+  evaluations: PathRejectionEvaluation[];
+  retainedEligiblePathCount: number;
+  retainedCandidatePathCount: number;
+  rejectedPathCount: number;
+  disposition: PathRejectionDisposition;
+  errors: string[];
 }
 
 export interface PathScore {

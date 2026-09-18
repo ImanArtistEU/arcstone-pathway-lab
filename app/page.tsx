@@ -2,6 +2,7 @@ import { pathwayDemoDataset } from "@/data/fixtures/pathway-demo";
 import { assertDatasetIntegrity } from "@/lib/pathway/assertDatasetIntegrity";
 import { qualifyRelationships } from "@/lib/pathway/qualifyRelationships";
 import { generatePathsForTarget } from "@/lib/pathway/generatePathsForTarget";
+import { applyPathRejection } from "@/lib/pathway/applyPathRejection";
 
 export default function HomePage() {
   const integrity = assertDatasetIntegrity(pathwayDemoDataset);
@@ -17,11 +18,13 @@ export default function HomePage() {
 
   const targets = pathwayDemoDataset.targetInvestors.map((target) => {
     const orgName = orgMap.get(target.investorOrganizationId) || target.investorOrganizationId;
-    const result = generatePathsForTarget(pathwayDemoDataset, target.id, "2026-09-18");
+    const generationResult = generatePathsForTarget(pathwayDemoDataset, target.id, "2026-09-18");
+    const rejectionResult = applyPathRejection(generationResult);
     return {
       targetId: target.id,
       orgName,
-      result,
+      generationResult,
+      rejectionResult,
     };
   });
 
@@ -36,7 +39,7 @@ export default function HomePage() {
         </p>
 
         <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 mb-6">
-          Batch 3.1 — Path generation contract hardened
+          Batch 4 — Path rejection operational
         </div>
 
         {/* Dataset Counts */}
@@ -98,33 +101,16 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Path Generation Results */}
+        {/* Path Rejection Results */}
         <div className="border-t border-gray-100 pt-5 text-left mb-5 space-y-3">
           <span className="text-xs uppercase tracking-wider text-gray-500 font-medium block mb-2">
-            Path Generation by Target
+            Path Rejection by Target
           </span>
-          {targets.map(({ targetId, orgName, result }) => {
-            const badgeText =
-              result.disposition === "eligible_path_available"
-                ? "ELIGIBLE PATH"
-                : result.disposition === "confirmation_path_available"
-                ? "CONFIRMATION REQUIRED"
-                : result.disposition === "confirmation_paths_filtered"
-                ? "CONFIRMATION PATHS FILTERED"
-                : result.disposition === "no_known_path"
-                ? "NO KNOWN PATH"
-                : "ANALYSIS ERROR";
-
-            const badgeClass =
-              result.disposition === "eligible_path_available"
-                ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                : result.disposition === "confirmation_path_available"
-                ? "text-amber-700 bg-amber-50 border-amber-200"
-                : result.disposition === "confirmation_paths_filtered"
-                ? "text-blue-700 bg-blue-50 border-blue-200"
-                : result.disposition === "no_known_path"
-                ? "text-slate-700 bg-slate-50 border-slate-200"
-                : "text-rose-700 bg-rose-50 border-rose-200";
+          {targets.map(({ targetId, orgName, generationResult, rejectionResult }) => {
+            const allEvaluated = [
+              ...rejectionResult.retainedPaths,
+              ...rejectionResult.rejectedPaths,
+            ];
 
             return (
               <div
@@ -135,31 +121,58 @@ export default function HomePage() {
                   <span className="font-semibold text-gray-900 text-sm">
                     {orgName}
                   </span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded border font-medium ${badgeClass}`}
-                  >
-                    {badgeText}
+                  <span className="text-xs font-mono text-gray-500">
+                    GENERATED: {rejectionResult.inputPathCount} | RETAINED: {rejectionResult.retainedPaths.length} | REJECTED: {rejectionResult.rejectedPathCount}
                   </span>
                 </div>
-                <div className="space-y-1">
-                  {result.paths.length > 0 ? (
-                    result.paths.map((p) => (
-                      <div
-                        key={p.id}
-                        className="text-xs text-gray-600 font-mono"
-                      >
-                        {p.nodes
-                          .map((n) => personMap.get(n.id) || n.id)
-                          .join(" → ")}
-                      </div>
-                    ))
+                <div className="space-y-1.5">
+                  {allEvaluated.length > 0 ? (
+                    allEvaluated.map((p) => {
+                      const evalRecord = rejectionResult.evaluations.find(
+                        (e) => e.pathId === p.id
+                      );
+                      const isRetained = evalRecord?.decision === "retain";
+                      const isEligible = p.status === "eligible";
+
+                      const statusBadgeText = isRetained
+                        ? isEligible
+                          ? "RETAINED"
+                          : "RETAINED — CONFIRMATION REQUIRED"
+                        : `REJECTED — ${evalRecord?.reasonCodes.join(", ")}`;
+
+                      const statusBadgeClass = isRetained
+                        ? isEligible
+                          ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                          : "text-amber-700 bg-amber-50 border-amber-200"
+                        : "text-rose-700 bg-rose-50 border-rose-200";
+
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex flex-col text-xs font-mono p-1.5 bg-white rounded border border-gray-100 space-y-1"
+                        >
+                          <div className="text-gray-800">
+                            {p.nodes
+                              .map((n) => personMap.get(n.id) || n.id)
+                              .join(" → ")}
+                          </div>
+                          <div>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${statusBadgeClass}`}
+                            >
+                              {statusBadgeText}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
                   ) : (
                     <div className="text-xs text-gray-500 font-mono italic">
-                      {result.executionStatus === "error"
-                        ? "Analysis error"
-                        : result.disposition === "confirmation_paths_filtered"
-                        ? "Confirmation paths filtered"
-                        : "Cold outreach required"}
+                      {generationResult.executionStatus === "error"
+                        ? "Upstream generation error"
+                        : rejectionResult.disposition === "upstream_paths_filtered"
+                        ? "Confirmation paths filtered upstream"
+                        : "NO GENERATED PATH"}
                     </div>
                   )}
                 </div>

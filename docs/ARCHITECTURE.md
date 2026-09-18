@@ -30,6 +30,14 @@ $$\mathbf{ANALYSIS\ ERROR} \neq \mathbf{NO\ KNOWN\ PATH}$$
 
 $$\mathbf{POLICY\ FILTERING} \neq \mathbf{NO\ KNOWN\ PATH}$$
 
+$$\mathbf{PATH\ EXISTENCE} \neq \mathbf{PATH\ VIABILITY}$$
+
+$$\mathbf{REJECTION} \neq \mathbf{RANKING}$$
+
+$$\mathbf{RETAINED} \neq \mathbf{RECOMMENDED}$$
+
+$$\mathbf{ALL\ PATHS\ REJECTED} \neq \mathbf{COLD\ OUTREACH\ REQUIRED}$$
+
 1. **Network Visibility $\neq$ Introduction Credibility**: A weak tie or social graph connection may establish proximity, but Arcstone requires verifiable interaction or corroborated evidence before considering a relationship credible for a fundraising introduction.
 2. **Observation Time $\neq$ Interaction Time**: The time Arcstone observes or ingests an evidence artifact (`observedAt`) is strictly decoupled from the time the human interaction occurred (`interaction.occurredAt`).
 3. **Outreach $\neq$ Reciprocal Relationship**: One-way outbound outreach (e.g. unreplied email) does not constitute a reciprocal relationship and cannot qualify as introduction-eligible.
@@ -38,10 +46,14 @@ $$\mathbf{POLICY\ FILTERING} \neq \mathbf{NO\ KNOWN\ PATH}$$
 6. **Path Generation $\neq$ Path Ranking**: Path discovery discovers all valid simple routes within depth bounds. Ranking, multi-dimensional scoring, and target selection occur in subsequent pipeline stages.
 7. **Analysis Error $\neq$ No Known Path**: Input validation errors, missing entities, invalid reference dates, or unverified affiliations yield `executionStatus: "error"`, `disposition: null`, `coldOutreachRequired: null`. Arcstone never reports `no_known_path` when analysis fails.
 8. **Policy Filtering $\neq$ No Known Path**: Excluding confirmation paths via `includeConfirmationRequired: false` yields `disposition: "confirmation_paths_filtered"` and `coldOutreachRequired: false`. Excluding routes by configuration is distinct from their absence in the network.
+9. **Path Existence $\neq$ Path Viability**: A route existing structurally in the graph does not guarantee usability. Path Rejection filters out unreliable or data-flawed routes.
+10. **Rejection $\neq$ Ranking**: Path Rejection applies pass/fail viability bounds without computing scores or ranking surviving routes.
+11. **Retained $\neq$ Recommended**: Retained paths merely survive viability filters; recommendation decisions occur in subsequent pipeline stages.
+12. **All Paths Rejected $\neq$ Cold Outreach Required**: Rejection evaluates candidate path viability; it does not decide outreach strategy.
 
 ## Current status
 
-Batch 3.1 — Path Generation Contract Hardening operational.
+Batch 4 — Deterministic Path Rejection / Viability Filter operational.
 
 ## Graph Semantics & Path Traversal
 
@@ -50,6 +62,7 @@ Batch 3.1 — Path Generation Contract Hardening operational.
 * **Person-Only Introduction Graph**: Only relationships between two person nodes enter traversal. Structural affiliations provide target context but are never traversed as hops.
 * **Target Candidate Affiliation Verification**: Candidates must be verifiably affiliated via `currentOrganizationIds` or a structural `works_at` edge. Unverified affiliations fail closed.
 * **Deterministic Bounded BFS**: Explores all simple paths from each founder to candidate target people up to `maxRelationshipHops` (default 3), eliminating cycles.
+* **Deterministic Path Rejection**: Filters generated candidates based on hard data-quality rules (one-way outreach, invalid/future interaction dates) and compounding uncertainty limits (`maxConfirmationRequiredHops`).
 * **Primary Fixture Negative Control**: Primary demonstration network strictly isolates Case D (Aurora Global Ventures / Isabel Torres) with zero non-structural edges, ensuring an absolute negative control for Path Generation.
 * **Referential Consistency**: Relationships and evidence are strictly bound with bidirectional referential integrity, preventing dangling or misattributed citations.
 
@@ -70,7 +83,7 @@ Relationship Qualification [IMPLEMENTED]
       ↓
 Path Generation [IMPLEMENTED]
       ↓
-Path Rejection [PLANNED]
+Path Rejection [IMPLEMENTED]
       ↓
 Path Scoring [PLANNED]
       ↓
