@@ -4,6 +4,7 @@ import {
   PathTraversalStep,
   PathGenerationResult,
   PathGenerationDisposition,
+  PathGenerationError,
   EntityReference,
 } from "@/types/pathway";
 import { assertDatasetIntegrity } from "./assertDatasetIntegrity";
@@ -21,17 +22,43 @@ interface PathSearchState {
   steps: PathTraversalStep[];
 }
 
+function createErrorResult(
+  targetInvestorId: string,
+  errors: PathGenerationError[],
+  campaignId = "",
+  sourceFounderPersonIds: string[] = [],
+  targetPersonIds: string[] = []
+): PathGenerationResult {
+  return {
+    executionStatus: "error",
+    targetInvestorId,
+    campaignId,
+    sourceFounderPersonIds,
+    targetPersonIds,
+    paths: [],
+    eligiblePathCount: 0,
+    confirmationRequiredPathCount: 0,
+    filteredConfirmationPathCount: 0,
+    disposition: null,
+    coldOutreachRequired: null,
+    errors,
+  };
+}
+
 /**
  * Deterministically generates all simple person-to-person routes from campaign founders
  * to candidate people of a target investor organization.
  *
- * Invariants:
- * 1. QUALIFICATION GATES TRAVERSAL: Only qualified relationships enter graph traversal.
- * 2. STRUCTURAL CONTEXT != INTRODUCTION EDGE: Structural edges (works_at, etc.) never traverse.
- * 3. ORGANIZATION != INTRODUCER: Paths consist exclusively of person nodes.
- * 4. SEMANTIC DIRECTION != TRAVERSAL DIRECTION: Governed strictly by TraversalPolicy.
- * 5. PATH GENERATION != PATH RANKING: All discovered simple paths within maxRelationshipHops
- *    are returned in deterministic enumeration order without quality ranking or best-path bias.
+ * Contract & Invariants:
+ * 1. ANALYSIS ERROR != NO KNOWN PATH: Invalid dataset, missing entities, or invalid policies yield
+ *    executionStatus: "error", disposition: null, coldOutreachRequired: null.
+ * 2. POLICY FILTERING != NO KNOWN PATH: Excluding confirmation paths yields disposition: "confirmation_paths_filtered",
+ *    coldOutreachRequired: false.
+ * 3. QUALIFICATION GATES TRAVERSAL: Only qualified relationships enter graph traversal.
+ * 4. STRUCTURAL CONTEXT != INTRODUCTION EDGE: Structural edges (works_at, etc.) never traverse.
+ * 5. ORGANIZATION != INTRODUCER: Paths consist exclusively of person nodes.
+ * 6. TARGET PERSON AFFILIATION VERIFIED: Candidates must be currently affiliated via currentOrganizationIds
+ *    or a current works_at relationship.
  */
 export function generatePathsForTarget(
   dataset: PathwayDataset,
@@ -40,126 +67,271 @@ export function generatePathsForTarget(
   pathPolicy?: Partial<PathGenerationPolicy>,
   qualificationPolicy?: QualificationPolicy
 ): PathGenerationResult {
-  const policy: PathGenerationPolicy = {
-    ...DEFAULT_PATH_GENERATION_POLICY,
-    ...pathPolicy,
-  };
-
-  const emptyResult = (
-    errors: string[],
-    campaignId = "",
-    sourceFounders: string[] = [],
-    targetPersons: string[] = []
-  ): PathGenerationResult => ({
-    targetInvestorId,
-    campaignId,
-    sourceFounderPersonIds: sourceFounders,
-    targetPersonIds: targetPersons,
-    paths: [],
-    eligiblePathCount: 0,
-    confirmationRequiredPathCount: 0,
-    disposition: "no_known_path",
-    coldOutreachRequired: true,
-    errors,
-  });
-
-  // 1. Validate dataset integrity
-  const integrity = assertDatasetIntegrity(dataset);
-  if (!integrity.valid) {
-    return emptyResult([
-      "Dataset integrity validation failed before path generation:",
-      ...integrity.errors,
+  // 1. Validate Reference Date
+  let refDateObj: Date;
+  if (referenceDate instanceof Date) {
+    refDateObj = referenceDate;
+  } else if (typeof referenceDate === "string" && referenceDate.trim() !== "") {
+    refDateObj = new Date(referenceDate);
+  } else {
+    return createErrorResult(targetInvestorId, [
+      {
+        code: "INVALID_REFERENCE_DATE",
+        message: "Reference date must be a non-empty valid date string or Date object.",
+      },
     ]);
   }
 
-  // 2. Resolve requested TargetInvestor
+  if (isNaN(refDateObj.getTime())) {
+    return createErrorResult(targetInvestorId, [
+      {
+        code: "INVALID_REFERENCE_DATE",
+        message: `Invalid reference date provided: ${String(referenceDate)}`,
+      },
+    ]);
+  }
+
+  // 2. Validate Path Generation Policy
+  const maxRelationshipHops =
+    pathPolicy?.maxRelationshipHops ??
+    DEFAULT_PATH_GENERATION_POLICY.maxRelationshipHops;
+  if (
+    typeof maxRelationshipHops !== "number" ||
+    !Number.isFinite(maxRelationshipHops) ||
+    !Number.isInteger(maxRelationshipHops) ||
+    maxRelationshipHops < 1
+  ) {
+    return createErrorResult(targetInvestorId, [
+      {
+        code: "INVALID_PATH_POLICY",
+        message: `maxRelationshipHops must be a finite integer >= 1, received: ${String(
+          maxRelationshipHops
+        )}`,
+      },
+    ]);
+  }
+
+  const includeConfirmationRequired =
+    pathPolicy?.includeConfirmationRequired ??
+    DEFAULT_PATH_GENERATION_POLICY.includeConfirmationRequired;
+  if (typeof includeConfirmationRequired !== "boolean") {
+    return createErrorResult(targetInvestorId, [
+      {
+        code: "INVALID_PATH_POLICY",
+        message: `includeConfirmationRequired must be a boolean, received: ${String(
+          includeConfirmationRequired
+        )}`,
+      },
+    ]);
+  }
+
+  const policy: PathGenerationPolicy = {
+    maxRelationshipHops,
+    includeConfirmationRequired,
+  };
+
+  // 3. Validate Qualification Policy if supplied
+  if (qualificationPolicy !== undefined) {
+    const { recentMaxDays, agingMaxDays } = qualificationPolicy;
+    if (
+      typeof recentMaxDays !== "number" ||
+      !Number.isFinite(recentMaxDays) ||
+      !Number.isInteger(recentMaxDays) ||
+      recentMaxDays < 0
+    ) {
+      return createErrorResult(targetInvestorId, [
+        {
+          code: "INVALID_QUALIFICATION_POLICY",
+          message: `recentMaxDays must be a finite integer >= 0, received: ${String(
+            recentMaxDays
+          )}`,
+        },
+      ]);
+    }
+    if (
+      typeof agingMaxDays !== "number" ||
+      !Number.isFinite(agingMaxDays) ||
+      !Number.isInteger(agingMaxDays) ||
+      agingMaxDays < recentMaxDays
+    ) {
+      return createErrorResult(targetInvestorId, [
+        {
+          code: "INVALID_QUALIFICATION_POLICY",
+          message: `agingMaxDays must be a finite integer >= recentMaxDays, received: ${String(
+            agingMaxDays
+          )}`,
+        },
+      ]);
+    }
+  }
+
+  // 4. Validate Dataset Integrity
+  const integrity = assertDatasetIntegrity(dataset);
+  if (!integrity.valid) {
+    return createErrorResult(targetInvestorId, [
+      {
+        code: "INVALID_DATASET",
+        message: `Dataset integrity validation failed: ${integrity.errors.join(
+          "; "
+        )}`,
+      },
+    ]);
+  }
+
+  // 5. Resolve requested TargetInvestor
   const targetInvestor = dataset.targetInvestors.find(
     (t) => t.id === targetInvestorId
   );
   if (!targetInvestor) {
-    return emptyResult([
-      `TargetInvestor "${targetInvestorId}" not found in dataset.`,
+    return createErrorResult(targetInvestorId, [
+      {
+        code: "TARGET_INVESTOR_NOT_FOUND",
+        message: `TargetInvestor "${targetInvestorId}" not found in dataset.`,
+        entityId: targetInvestorId,
+      },
     ]);
   }
 
-  // 3. Resolve its campaign
+  // 6. Resolve Campaign
   const campaign = dataset.campaigns.find(
     (c) => c.id === targetInvestor.campaignId
   );
   if (!campaign) {
-    return emptyResult(
+    return createErrorResult(
+      targetInvestorId,
       [
-        `Campaign "${targetInvestor.campaignId}" referenced by TargetInvestor "${targetInvestorId}" not found in dataset.`,
+        {
+          code: "CAMPAIGN_NOT_FOUND",
+          message: `Campaign "${targetInvestor.campaignId}" referenced by TargetInvestor "${targetInvestorId}" not found in dataset.`,
+          entityId: targetInvestor.campaignId,
+        },
       ],
       targetInvestor.campaignId
     );
   }
 
-  // 4. Resolve campaign founders
+  // 7. Resolve Campaign Founders
   const sourceFounderPersonIds = campaign.founderPersonIds || [];
   if (sourceFounderPersonIds.length === 0) {
-    return emptyResult(
-      [`Campaign "${campaign.id}" contains zero founderPersonIds.`],
+    return createErrorResult(
+      targetInvestorId,
+      [
+        {
+          code: "NO_FOUNDERS",
+          message: `Campaign "${campaign.id}" contains zero founderPersonIds.`,
+          entityId: campaign.id,
+        },
+      ],
       campaign.id
     );
   }
 
-  const missingFounders = sourceFounderPersonIds.filter(
-    (id) => !dataset.people.some((p) => p.id === id)
-  );
-  if (missingFounders.length > 0) {
-    return emptyResult(
-      [
-        `Founder person ID(s) not found in dataset.people: ${missingFounders.join(
-          ", "
-        )}`,
-      ],
-      campaign.id,
-      sourceFounderPersonIds
-    );
+  for (const fId of sourceFounderPersonIds) {
+    if (!dataset.people.some((p) => p.id === fId)) {
+      return createErrorResult(
+        targetInvestorId,
+        [
+          {
+            code: "FOUNDER_NOT_FOUND",
+            message: `Founder person "${fId}" not found in dataset.people.`,
+            entityId: fId,
+          },
+        ],
+        campaign.id,
+        sourceFounderPersonIds
+      );
+    }
   }
 
-  // 5. Resolve candidate target people
+  // 8. Resolve Candidate Target People
   const targetPersonIds = targetInvestor.candidatePersonIds || [];
   if (targetPersonIds.length === 0) {
-    return emptyResult(
+    return createErrorResult(
+      targetInvestorId,
       [
-        `TargetInvestor "${targetInvestorId}" contains zero candidatePersonIds.`,
+        {
+          code: "NO_TARGET_PEOPLE",
+          message: `TargetInvestor "${targetInvestorId}" contains zero candidatePersonIds.`,
+          entityId: targetInvestorId,
+        },
       ],
       campaign.id,
       sourceFounderPersonIds
     );
   }
 
-  const missingCandidates = targetPersonIds.filter(
-    (id) => !dataset.people.some((p) => p.id === id)
-  );
-  if (missingCandidates.length > 0) {
-    return emptyResult(
-      [
-        `Candidate target person ID(s) not found in dataset.people: ${missingCandidates.join(
-          ", "
-        )}`,
-      ],
-      campaign.id,
-      sourceFounderPersonIds,
-      targetPersonIds
+  for (const cId of targetPersonIds) {
+    if (!dataset.people.some((p) => p.id === cId)) {
+      return createErrorResult(
+        targetInvestorId,
+        [
+          {
+            code: "TARGET_PERSON_NOT_FOUND",
+            message: `Candidate target person "${cId}" not found in dataset.people.`,
+            entityId: cId,
+          },
+        ],
+        campaign.id,
+        sourceFounderPersonIds,
+        targetPersonIds
+      );
+    }
+  }
+
+  // 9. Verify Target Person Affiliation
+  for (const cId of targetPersonIds) {
+    const person = dataset.people.find((p) => p.id === cId)!;
+    const targetOrgId = targetInvestor.investorOrganizationId;
+
+    const isOrgIdMatch =
+      Array.isArray(person.currentOrganizationIds) &&
+      person.currentOrganizationIds.includes(targetOrgId);
+
+    const isWorksAtMatch = dataset.relationships.some(
+      (r) =>
+        r.from.type === "person" &&
+        r.from.id === cId &&
+        r.to.type === "organization" &&
+        r.to.id === targetOrgId &&
+        r.type === "works_at"
     );
+
+    if (!isOrgIdMatch && !isWorksAtMatch) {
+      return createErrorResult(
+        targetInvestorId,
+        [
+          {
+            code: "TARGET_PERSON_AFFILIATION_UNVERIFIED",
+            message: `Candidate target person "${cId}" is not verifiably currently affiliated with target investor organization "${targetOrgId}".`,
+            entityId: cId,
+          },
+        ],
+        campaign.id,
+        sourceFounderPersonIds,
+        targetPersonIds
+      );
+    }
   }
 
   const targetPersonSet = new Set(targetPersonIds);
 
-  // 6. Run Relationship Qualification
+  // 10. Run Relationship Qualification
   const qualifications = qualifyRelationships(
     dataset,
-    referenceDate,
+    refDateObj,
     qualificationPolicy
   );
 
-  // 7. Build deterministic traversal graph
-  const graph = buildTraversalGraph(dataset, qualifications, policy);
+  // Build internal traversal graph with includeConfirmationRequired: true
+  // so we discover all candidate routes in the network regardless of display filter
+  const internalGraphPolicy: PathGenerationPolicy = {
+    maxRelationshipHops: policy.maxRelationshipHops,
+    includeConfirmationRequired: true,
+  };
 
-  // 8. Bounded Breadth-First Search from each founder to candidate target people
+  const graph = buildTraversalGraph(dataset, qualifications, internalGraphPolicy);
+
+  // 11. Bounded Breadth-First Search from each founder to candidate target people
   const candidatePaths: PathCandidate[] = [];
 
   for (const founderPersonId of sourceFounderPersonIds) {
@@ -174,7 +346,6 @@ export function generatePathsForTarget(
     while (queue.length > 0) {
       const state = queue.shift()!;
 
-      // If maximum hops reached, cannot expand further
       if (state.steps.length >= policy.maxRelationshipHops) {
         continue;
       }
@@ -185,7 +356,6 @@ export function generatePathsForTarget(
       for (const edge of outgoingEdges) {
         const nextPersonId = edge.destinationPersonId;
 
-        // Prevent cycles within the candidate path
         if (state.visitedPersonIds.has(nextPersonId)) {
           continue;
         }
@@ -201,9 +371,7 @@ export function generatePathsForTarget(
 
         const updatedSteps = [...state.steps, nextStep];
 
-        // Check if destination is a candidate target person
         if (targetPersonSet.has(nextPersonId)) {
-          // Reached target candidate: create candidate path
           const nodes: EntityReference[] = [
             { type: "person", id: founderPersonId },
             ...updatedSteps.map((s) => ({
@@ -228,7 +396,6 @@ export function generatePathsForTarget(
             }
           }
 
-          // Generate stable deterministic path ID
           const stepSequence = updatedSteps
             .map((s) =>
               s.traversedReverse
@@ -251,10 +418,7 @@ export function generatePathsForTarget(
             status: isEligible ? "eligible" : "candidate",
             requiresConfirmationRelationshipIds: confirmationReqRels,
           });
-
-          // Stop expanding this path once a candidate target person is reached
         } else {
-          // Continue expanding if under maxRelationshipHops
           if (updatedSteps.length < policy.maxRelationshipHops) {
             const nextVisited = new Set(state.visitedPersonIds);
             nextVisited.add(nextPersonId);
@@ -276,35 +440,53 @@ export function generatePathsForTarget(
     return a.id.localeCompare(b.id);
   });
 
-  const eligiblePathCount = candidatePaths.filter(
+  const knownEligiblePaths = candidatePaths.filter(
     (p) => p.status === "eligible"
-  ).length;
-  const confirmationRequiredPathCount = candidatePaths.filter(
+  );
+  const knownConfirmationPaths = candidatePaths.filter(
     (p) => p.status === "candidate"
-  ).length;
+  );
+
+  const eligiblePathCount = knownEligiblePaths.length;
+  const confirmationRequiredPathCount = knownConfirmationPaths.length;
+
+  const returnedPaths = policy.includeConfirmationRequired
+    ? candidatePaths
+    : knownEligiblePaths;
+
+  const filteredConfirmationPathCount = policy.includeConfirmationRequired
+    ? 0
+    : confirmationRequiredPathCount;
 
   let disposition: PathGenerationDisposition;
-  let coldOutreachRequired = false;
-
   if (eligiblePathCount > 0) {
     disposition = "eligible_path_available";
-    coldOutreachRequired = false;
-  } else if (confirmationRequiredPathCount > 0) {
+  } else if (
+    policy.includeConfirmationRequired &&
+    confirmationRequiredPathCount > 0
+  ) {
     disposition = "confirmation_path_available";
-    coldOutreachRequired = false;
+  } else if (
+    !policy.includeConfirmationRequired &&
+    confirmationRequiredPathCount > 0
+  ) {
+    disposition = "confirmation_paths_filtered";
   } else {
     disposition = "no_known_path";
-    coldOutreachRequired = true;
   }
 
+  const coldOutreachRequired = disposition === "no_known_path";
+
   return {
+    executionStatus: "success",
     targetInvestorId,
     campaignId: campaign.id,
     sourceFounderPersonIds,
     targetPersonIds,
-    paths: candidatePaths,
+    paths: returnedPaths,
     eligiblePathCount,
     confirmationRequiredPathCount,
+    filteredConfirmationPathCount,
     disposition,
     coldOutreachRequired,
     errors: [],

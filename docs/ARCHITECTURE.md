@@ -26,22 +26,29 @@ $$\mathbf{STRUCTURAL\ CONTEXT} \neq \mathbf{INTRODUCTION\ EDGE}$$
 
 $$\mathbf{PATH\ GENERATION} \neq \mathbf{PATH\ RANKING}$$
 
+$$\mathbf{ANALYSIS\ ERROR} \neq \mathbf{NO\ KNOWN\ PATH}$$
+
+$$\mathbf{POLICY\ FILTERING} \neq \mathbf{NO\ KNOWN\ PATH}$$
+
 1. **Network Visibility $\neq$ Introduction Credibility**: A weak tie or social graph connection may establish proximity, but Arcstone requires verifiable interaction or corroborated evidence before considering a relationship credible for a fundraising introduction.
 2. **Observation Time $\neq$ Interaction Time**: The time Arcstone observes or ingests an evidence artifact (`observedAt`) is strictly decoupled from the time the human interaction occurred (`interaction.occurredAt`).
 3. **Outreach $\neq$ Reciprocal Relationship**: One-way outbound outreach (e.g. unreplied email) does not constitute a reciprocal relationship and cannot qualify as introduction-eligible.
 4. **Qualification Gates Traversal**: Raw relationships cannot enter graph traversal without satisfying qualification admission criteria (`eligible` or `confirmation_required` when permitted).
 5. **Structural Context $\neq$ Introduction Edge**: Legal, organizational, and corporate affiliations (`works_at`, `board_member`, etc.) establish context, but organizations cannot introduce anyone. Pathways consist exclusively of person nodes.
 6. **Path Generation $\neq$ Path Ranking**: Path discovery discovers all valid simple routes within depth bounds. Ranking, multi-dimensional scoring, and target selection occur in subsequent pipeline stages.
+7. **Analysis Error $\neq$ No Known Path**: Input validation errors, missing entities, invalid reference dates, or unverified affiliations yield `executionStatus: "error"`, `disposition: null`, `coldOutreachRequired: null`. Arcstone never reports `no_known_path` when analysis fails.
+8. **Policy Filtering $\neq$ No Known Path**: Excluding confirmation paths via `includeConfirmationRequired: false` yields `disposition: "confirmation_paths_filtered"` and `coldOutreachRequired: false`. Excluding routes by configuration is distinct from their absence in the network.
 
 ## Current status
 
-Batch 3 — Deterministic Path Generation & Traversal Engine operational.
+Batch 3.1 — Path Generation Contract Hardening operational.
 
 ## Graph Semantics & Path Traversal
 
 * **Observed Semantic Facts**: Relationships store empirical facts rather than assumptions. `Relationship.from` and `Relationship.to` encode semantic direction (e.g., Advisor $\rightarrow$ Advised Person).
 * **Direction vs. Traversal Permission**: Semantic edge direction is distinct from graph traversal permission. The fact that Marcus advises Elena does not prevent Elena from reaching Marcus; traversal rules are governed by centralized `TraversalPolicy`.
 * **Person-Only Introduction Graph**: Only relationships between two person nodes enter traversal. Structural affiliations provide target context but are never traversed as hops.
+* **Target Candidate Affiliation Verification**: Candidates must be verifiably affiliated via `currentOrganizationIds` or a structural `works_at` edge. Unverified affiliations fail closed.
 * **Deterministic Bounded BFS**: Explores all simple paths from each founder to candidate target people up to `maxRelationshipHops` (default 3), eliminating cycles.
 * **Primary Fixture Negative Control**: Primary demonstration network strictly isolates Case D (Aurora Global Ventures / Isabel Torres) with zero non-structural edges, ensuring an absolute negative control for Path Generation.
 * **Referential Consistency**: Relationships and evidence are strictly bound with bidirectional referential integrity, preventing dangling or misattributed citations.

@@ -16,7 +16,19 @@ A discovered route is **not** necessarily the recommended route. Batch 3 discove
 
 ## Core Invariants
 
-### 1. Invariant: Qualification Gates Traversal
+### 1. Invariant: Analysis Error $\neq$ No Known Path
+
+$$\mathbf{Analysis\ Error} \neq \mathbf{No\ Known\ Path}$$
+
+An invalid dataset, missing entity references, malformed policy parameters, unverified candidate affiliations, or an invalid reference date cause an **analysis error** (`executionStatus: "error"`, `disposition: null`, `coldOutreachRequired: null`). Arcstone never reports `no_known_path` or claims `coldOutreachRequired = true` when graph analysis could not complete successfully.
+
+### 2. Invariant: Policy Filtering $\neq$ No Known Path
+
+$$\mathbf{Policy\ Filtering} \neq \mathbf{No\ Known\ Path}$$
+
+When the caller configures `includeConfirmationRequired: false`, confirmation-required paths are excluded from the returned path list, but Arcstone still recognizes that a route exists in the underlying network. This state returns `disposition: "confirmation_paths_filtered"` and `coldOutreachRequired: false`. Excluding paths by configuration is distinct from their absence in the network.
+
+### 3. Invariant: Qualification Gates Traversal
 
 $$\mathbf{Qualification\ Status} \implies \mathbf{Traversal\ Admission}$$
 
@@ -26,7 +38,7 @@ A relationship edge existing in the raw dataset does not make it traversable. It
 
 Edges with status `ineligible` or `structural` are strictly barred from entering the introduction graph.
 
-### 2. Invariant: Structural Context $\neq$ Introduction Edge
+### 4. Invariant: Structural Context $\neq$ Introduction Edge
 
 $$\mathbf{Structural\ Context} \neq \mathbf{Introduction\ Edge}$$
 
@@ -34,13 +46,13 @@ Structural relationships (such as `works_at`, `founder_of`, `board_member`, `inv
 
 Therefore, intro pathways consist **exclusively of person nodes** connected through qualified non-structural relationships. Structural edges are never traversed as hops.
 
-### 3. Invariant: Organization $\neq$ Introducer
+### 5. Invariant: Organization $\neq$ Introducer
 
 $$\mathbf{Organization} \neq \mathbf{Introducer}$$
 
 Only human entities (`type: "person"`) possess social capital and the agency to introduce third parties. Any relationship with an organization endpoint (`Person → Org`, `Org → Person`, `Org → Org`) cannot serve as an introduction hop.
 
-### 4. Invariant: Semantic Direction $\neq$ Traversal Direction
+### 6. Invariant: Semantic Direction $\neq$ Traversal Direction
 
 $$\mathbf{Semantic\ Direction} \neq \mathbf{Traversal\ Direction}$$
 
@@ -48,6 +60,20 @@ $$\mathbf{Semantic\ Direction} \neq \mathbf{Traversal\ Direction}$$
 * Advisees regularly request introductions through their advisors (`Elena → Marcus`).
 * Mentees reach out through mentors (`Mentee → Mentor`).
 * Introduced parties coordinate through the introducer.
+
+---
+
+## Input & Policy Validation
+
+Before traversal occurs, inputs and policy objects are strictly validated:
+
+1. **Reference Date Validation**: `referenceDate` must be a valid, non-empty date string or non-NaN `Date` object. If malformed, analysis immediately returns error code `INVALID_REFERENCE_DATE`.
+2. **Path Policy Validation**: `maxRelationshipHops` must be a finite integer $\ge 1$. `includeConfirmationRequired` must be a boolean. Invalid values return `INVALID_PATH_POLICY`.
+3. **Qualification Policy Validation**: If provided, `recentMaxDays` must be a finite integer $\ge 0$, and `agingMaxDays` must be a finite integer $\ge recentMaxDays$. Otherwise returns `INVALID_QUALIFICATION_POLICY`.
+4. **Target Candidate Affiliation Verification**: For every candidate person ID listed in `targetInvestor.candidatePersonIds`, the person must be verifiably currently affiliated with `targetInvestor.investorOrganizationId` via either:
+   - `Person.currentOrganizationIds` containing the investor organization ID, OR
+   - A structural `works_at` relationship from `Person → Investor Organization`.
+   If unverified, analysis fails closed with `TARGET_PERSON_AFFILIATION_UNVERIFIED` and the specific person ID in `entityId`.
 
 ---
 
@@ -70,10 +96,7 @@ Traversal direction is governed centrally by `lib/pathway/traversalPolicy.ts`:
 2. **Simple Path / Cycle Prevention**: Each candidate path tracks its set of visited person IDs. No person node may appear more than once in the same path.
 3. **Target Candidate Termination**: As soon as a path reaches any candidate person ID in `targetInvestor.candidatePersonIds`, that path is emitted as a `PathCandidate` and its branch is **not** expanded further.
 4. **Depth Bound (`maxRelationshipHops`)**:
-   Paths are bounded to a maximum number of relationship hops (default: 3).
-
-> [!IMPORTANT]
-> `maxRelationshipHops = 3` is a working prototype **product hypothesis**, not a mathematical constant. Routes beyond 3 hops (e.g. Founder → Intermediary A → Intermediary B → Partner) suffer severe social decay and high drop-off in early-stage fundraising. This threshold will be calibrated against real introduction conversion rates in future batches.
+   `maxRelationshipHops = 3` is a working product hypothesis intended to limit route complexity and will be validated against real introduction outcomes.
 
 ---
 
@@ -86,17 +109,19 @@ Traversal direction is governed centrally by `lib/pathway/traversalPolicy.ts`:
 
 ## Path Classification & Dispositions
 
-### Candidate Path Status (`PathCandidate.status`)
-* **`eligible`**: Every relationship hop in the path is qualified as `eligible`.
-  `requiresConfirmationRelationshipIds: []`.
-* **`candidate`**: The path exists structurally, but one or more relationship hops have qualification status `confirmation_required`.
-  `requiresConfirmationRelationshipIds` contains the specific relationship IDs requiring verification.
+### Result Execution Status (`PathGenerationResult.executionStatus`)
+* **`success`**: Analysis completed successfully over valid inputs and policies.
+* **`error`**: Analysis failed due to invalid inputs, missing references, unverified affiliations, or policy errors. `disposition = null`, `coldOutreachRequired = null`.
+
+### Structured Error Contract (`PathGenerationError`)
+Structured error objects contain `code` (e.g. `INVALID_DATASET`, `TARGET_INVESTOR_NOT_FOUND`, `TARGET_PERSON_AFFILIATION_UNVERIFIED`), `message`, and optional `entityId`.
 
 ### Target Investor Dispositions (`PathGenerationResult.disposition`)
 * **`eligible_path_available`**: At least one fully eligible path exists to a candidate decision-maker. `coldOutreachRequired = false`.
-* **`confirmation_path_available`**: No fully eligible path exists, but at least one confirmation-required path exists. `coldOutreachRequired = false`.
-  *(Note: This does not claim a guaranteed warm intro; it signals that founder confirmation is required before proceeding.)*
-* **`no_known_path`**: Zero traversable paths exist within configured bounds. `coldOutreachRequired = true`.
+* **`confirmation_path_available`**: No fully eligible path exists, but at least one confirmation-required path exists and was included by policy. `coldOutreachRequired = false`.
+* **`confirmation_paths_filtered`**: Confirmation-required paths exist in the network, but `includeConfirmationRequired = false` excluded them from returned `paths`. `coldOutreachRequired = false`.
+* **`no_known_path`**: Analysis successfully completed and determined zero traversable paths exist within configured bounds. `coldOutreachRequired = true`.
+* **`null`**: Analysis produced an error (`executionStatus: "error"`).
 
 ---
 

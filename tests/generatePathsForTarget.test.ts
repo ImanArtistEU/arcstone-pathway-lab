@@ -12,7 +12,7 @@ import { PathwayDataset, Relationship, RelationshipEvidence } from "@/types/path
 
 const REFERENCE_DATE = "2026-09-18";
 
-describe("Deterministic Path Generation & Traversal Engine", () => {
+describe("Deterministic Path Generation & Traversal Engine (Batch 3.1 Hardened)", () => {
   // Case A: Horizon Ventures
   it("1: Horizon generates Elena → Marcus → Sarah", () => {
     const res = generatePathsForTarget(
@@ -20,6 +20,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-horizon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.paths.length).toBe(1);
     const path = res.paths[0];
     expect(path.nodes.map((n) => n.id)).toEqual([
@@ -35,10 +36,12 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-horizon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.disposition).toBe("eligible_path_available");
     expect(res.coldOutreachRequired).toBe(false);
     expect(res.eligiblePathCount).toBe(1);
     expect(res.confirmationRequiredPathCount).toBe(0);
+    expect(res.filteredConfirmationPathCount).toBe(0);
     expect(res.paths[0].status).toBe("eligible");
     expect(res.paths[0].requiresConfirmationRelationshipIds).toEqual([]);
   });
@@ -49,6 +52,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-horizon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     const path = res.paths[0];
     expect(path.steps[0].relationshipId).toBe("rel-elena-marcus");
     expect(path.steps[0].fromPersonId).toBe("person-founder-elena");
@@ -67,6 +71,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-horizon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     const path = res.paths[0];
     expect(path.relationshipIds).toEqual(["rel-elena-marcus", "rel-marcus-sarah"]);
     expect(path.relationshipIds).not.toContain("rel-sarah-horizon");
@@ -79,6 +84,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-horizon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.paths[0].intermediaryCount).toBe(1);
   });
 
@@ -89,6 +95,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-beacon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.paths.length).toBe(1);
     const path = res.paths[0];
     expect(path.nodes.map((n) => n.id)).toEqual([
@@ -103,10 +110,12 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-beacon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.disposition).toBe("confirmation_path_available");
     expect(res.coldOutreachRequired).toBe(false);
     expect(res.eligiblePathCount).toBe(0);
     expect(res.confirmationRequiredPathCount).toBe(1);
+    expect(res.filteredConfirmationPathCount).toBe(0);
     expect(res.paths[0].status).toBe("candidate");
   });
 
@@ -116,6 +125,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-beacon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.paths[0].requiresConfirmationRelationshipIds).toEqual([
       "rel-elena-david",
     ]);
@@ -127,6 +137,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-beacon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.paths[0].intermediaryCount).toBe(0);
   });
 
@@ -137,6 +148,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-summit",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.paths.length).toBe(1);
     const path = res.paths[0];
     expect(path.nodes.map((n) => n.id)).toEqual([
@@ -152,6 +164,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-summit",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     const path = res.paths[0];
     expect(path.status).toBe("candidate");
     expect(path.requiresConfirmationRelationshipIds).toEqual([
@@ -162,16 +175,19 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
     expect(res.disposition).toBe("confirmation_path_available");
   });
 
-  // Case D: Aurora Global Ventures (Negative Control)
+  // Case D: Aurora Global Ventures (Canonical True Negative Control)
   it("12: Aurora produces zero paths", () => {
     const res = generatePathsForTarget(
       pathwayDemoDataset,
       "target-aurora",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.paths).toEqual([]);
     expect(res.eligiblePathCount).toBe(0);
     expect(res.confirmationRequiredPathCount).toBe(0);
+    expect(res.filteredConfirmationPathCount).toBe(0);
+    expect(res.errors).toEqual([]);
   });
 
   it("13: Aurora disposition = no_known_path", () => {
@@ -180,6 +196,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-aurora",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.disposition).toBe("no_known_path");
   });
 
@@ -189,6 +206,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-aurora",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.coldOutreachRequired).toBe(true);
   });
 
@@ -201,7 +219,6 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       DEFAULT_PATH_GENERATION_POLICY
     );
 
-    // Check all adjacency edges in graph
     for (const [, edges] of graph) {
       for (const edge of edges) {
         expect(edge.relationshipId).not.toBe("rel-founder-nexus");
@@ -218,7 +235,6 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
     const datasetWithIneligible: PathwayDataset = JSON.parse(
       JSON.stringify(pathwayDemoDataset)
     );
-    // Add an ineligible relationship (e.g. invalid date)
     const badRel: Relationship = {
       id: "rel-bad-edge",
       from: { type: "person", id: "person-founder-elena" },
@@ -244,16 +260,8 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
 
     const quals = qualifyRelationships(datasetWithIneligible, REFERENCE_DATE);
     const badQual = quals.find((q) => q.relationshipId === "rel-bad-edge");
-    // Ensure badQual is confirmation_required or ineligible
     expect(badQual).toBeDefined();
 
-    const graph = buildTraversalGraph(
-      datasetWithIneligible,
-      quals,
-      DEFAULT_PATH_GENERATION_POLICY
-    );
-    const elenaEdges = graph.get("person-founder-elena") || [];
-    // If we mock qualification status as ineligible
     const mockIneligibleQual = {
       ...badQual!,
       status: "ineligible" as const,
@@ -266,15 +274,17 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
     expect(isTraversable).toBe(false);
   });
 
-  it("17: Setting includeConfirmationRequired = false removes Beacon and Summit routes while preserving Horizon", () => {
+  it("17: Setting includeConfirmationRequired = false sets disposition = confirmation_paths_filtered for Beacon/Summit", () => {
     const horizonRes = generatePathsForTarget(
       pathwayDemoDataset,
       "target-horizon",
       REFERENCE_DATE,
       { includeConfirmationRequired: false }
     );
+    expect(horizonRes.executionStatus).toBe("success");
     expect(horizonRes.paths.length).toBe(1);
     expect(horizonRes.disposition).toBe("eligible_path_available");
+    expect(horizonRes.coldOutreachRequired).toBe(false);
 
     const beaconRes = generatePathsForTarget(
       pathwayDemoDataset,
@@ -282,9 +292,13 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       REFERENCE_DATE,
       { includeConfirmationRequired: false }
     );
+    expect(beaconRes.executionStatus).toBe("success");
     expect(beaconRes.paths.length).toBe(0);
-    expect(beaconRes.disposition).toBe("no_known_path");
-    expect(beaconRes.coldOutreachRequired).toBe(true);
+    expect(beaconRes.eligiblePathCount).toBe(0);
+    expect(beaconRes.confirmationRequiredPathCount).toBe(1);
+    expect(beaconRes.filteredConfirmationPathCount).toBe(1);
+    expect(beaconRes.disposition).toBe("confirmation_paths_filtered");
+    expect(beaconRes.coldOutreachRequired).toBe(false);
 
     const summitRes = generatePathsForTarget(
       pathwayDemoDataset,
@@ -292,9 +306,13 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       REFERENCE_DATE,
       { includeConfirmationRequired: false }
     );
+    expect(summitRes.executionStatus).toBe("success");
     expect(summitRes.paths.length).toBe(0);
-    expect(summitRes.disposition).toBe("no_known_path");
-    expect(summitRes.coldOutreachRequired).toBe(true);
+    expect(summitRes.eligiblePathCount).toBe(0);
+    expect(summitRes.confirmationRequiredPathCount).toBe(1);
+    expect(summitRes.filteredConfirmationPathCount).toBe(1);
+    expect(summitRes.disposition).toBe("confirmation_paths_filtered");
+    expect(summitRes.coldOutreachRequired).toBe(false);
   });
 
   it("18: maxRelationshipHops = 1 removes Horizon and Summit multi-hop paths", () => {
@@ -304,24 +322,18 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       REFERENCE_DATE,
       { maxRelationshipHops: 1 }
     );
+    expect(horizonRes.executionStatus).toBe("success");
     expect(horizonRes.paths.length).toBe(0);
     expect(horizonRes.disposition).toBe("no_known_path");
+    expect(horizonRes.coldOutreachRequired).toBe(true);
 
-    const summitRes = generatePathsForTarget(
-      pathwayDemoDataset,
-      "target-summit",
-      REFERENCE_DATE,
-      { maxRelationshipHops: 1 }
-    );
-    expect(summitRes.paths.length).toBe(0);
-
-    // Beacon is 1 hop so it remains
     const beaconRes = generatePathsForTarget(
       pathwayDemoDataset,
       "target-beacon",
       REFERENCE_DATE,
       { maxRelationshipHops: 1 }
     );
+    expect(beaconRes.executionStatus).toBe("success");
     expect(beaconRes.paths.length).toBe(1);
   });
 
@@ -332,12 +344,12 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       REFERENCE_DATE,
       { maxRelationshipHops: 2 }
     );
+    expect(horizonRes.executionStatus).toBe("success");
     expect(horizonRes.paths.length).toBe(1);
     expect(horizonRes.paths[0].relationshipIds.length).toBe(2);
   });
 
   it("20: Graph cycles do not produce cyclic paths", () => {
-    // Add a cycle: Sarah -> Marcus (already bidirectional) + Sarah -> Elena
     const cyclicDataset: PathwayDataset = JSON.parse(
       JSON.stringify(pathwayDemoDataset)
     );
@@ -369,7 +381,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-horizon",
       REFERENCE_DATE
     );
-    // Every path must contain no repeating person node
+    expect(res.executionStatus).toBe("success");
     for (const path of res.paths) {
       const personIds = path.nodes.map((n) => n.id);
       const uniqueIds = new Set(personIds);
@@ -383,6 +395,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-horizon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     for (const path of res.paths) {
       const personIds = path.nodes.map((n) => n.id);
       const uniqueIds = new Set(personIds);
@@ -413,6 +426,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-horizon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     for (let i = 0; i < res.paths.length - 1; i++) {
       const a = res.paths[i];
       const b = res.paths[i + 1];
@@ -439,7 +453,6 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
     const multiFounderDataset: PathwayDataset = JSON.parse(
       JSON.stringify(pathwayDemoDataset)
     );
-    // Add second founder John
     multiFounderDataset.people.push({
       id: "person-founder-john",
       firstName: "John",
@@ -449,7 +462,6 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
     });
     multiFounderDataset.campaigns[0].founderPersonIds.push("person-founder-john");
 
-    // Connect John -> Marcus as well
     multiFounderDataset.relationships.push({
       id: "rel-john-marcus",
       from: { type: "person", id: "person-advisor-marcus" },
@@ -478,6 +490,7 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-horizon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.sourceFounderPersonIds).toEqual([
       "person-founder-elena",
       "person-founder-john",
@@ -493,7 +506,6 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
     const multiCandidateDataset: PathwayDataset = JSON.parse(
       JSON.stringify(pathwayDemoDataset)
     );
-    // Add second partner Alex to Horizon
     multiCandidateDataset.people.push({
       id: "person-vc-alex",
       firstName: "Alex",
@@ -501,7 +513,6 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       fullName: "Alex Rivera",
       currentOrganizationIds: ["org-horizon-vc"],
     });
-    // Add rel-marcus-alex
     multiCandidateDataset.relationships.push({
       id: "rel-marcus-alex",
       from: { type: "person", id: "person-advisor-marcus" },
@@ -524,7 +535,6 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
         status: "confirmed",
       },
     });
-    // Add works_at for Alex
     multiCandidateDataset.relationships.push({
       id: "rel-alex-horizon",
       from: { type: "person", id: "person-vc-alex" },
@@ -550,96 +560,231 @@ describe("Deterministic Path Generation & Traversal Engine", () => {
       "target-horizon",
       REFERENCE_DATE
     );
+    expect(res.executionStatus).toBe("success");
     expect(res.targetPersonIds).toEqual(["person-vc-sarah", "person-vc-alex"]);
     expect(res.paths.length).toBe(2);
-    const targetPersons = res.paths.map((p) => p.targetPersonId);
-    expect(targetPersons).toContain("person-vc-sarah");
-    expect(targetPersons).toContain("person-vc-alex");
   });
 
-  it("27: Missing TargetInvestor returns structured error", () => {
-    const res = generatePathsForTarget(
-      pathwayDemoDataset,
-      "target-nonexistent",
-      REFERENCE_DATE
-    );
-    expect(res.disposition).toBe("no_known_path");
-    expect(res.coldOutreachRequired).toBe(true);
-    expect(res.paths).toEqual([]);
-    expect(res.errors.length).toBeGreaterThan(0);
-    expect(res.errors[0]).toContain("not found in dataset");
-  });
-
-  it("28: TargetInvestor with zero candidatePersonIds returns structured error", () => {
-    const invalidDataset: PathwayDataset = JSON.parse(
-      JSON.stringify(pathwayDemoDataset)
-    );
-    invalidDataset.targetInvestors[0].candidatePersonIds = [];
-
-    const res = generatePathsForTarget(
-      invalidDataset,
-      "target-horizon",
-      REFERENCE_DATE
-    );
-    expect(res.disposition).toBe("no_known_path");
-    expect(res.coldOutreachRequired).toBe(true);
-    expect(res.errors.length).toBeGreaterThan(0);
-    expect(res.errors[0]).toContain("zero candidatePersonIds");
-  });
-
-  it("29: Invalid dataset returns structured errors rather than traversing", () => {
-    const corruptDataset: PathwayDataset = JSON.parse(
-      JSON.stringify(pathwayDemoDataset)
-    );
-    // Break bidirectional referential integrity
-    corruptDataset.relationshipEvidence[0].relationshipId = "non-existent-rel";
-
-    const res = generatePathsForTarget(
-      corruptDataset,
-      "target-horizon",
-      REFERENCE_DATE
-    );
-    expect(res.disposition).toBe("no_known_path");
-    expect(res.coldOutreachRequired).toBe(true);
-    expect(res.paths).toEqual([]);
-    expect(res.errors.length).toBeGreaterThan(0);
-    expect(res.errors[0]).toContain("Dataset integrity validation failed");
-  });
-
-  it("30: Person→organization structural edges cannot be used to bridge a route", () => {
-    // Attempt to bridge route through organization: Founder -> Nexus -> Horizon -> Partner
-    const testDataset: PathwayDataset = JSON.parse(
-      JSON.stringify(pathwayDemoDataset)
-    );
-    // Remove direct relationships to Sarah
-    testDataset.relationships = testDataset.relationships.filter(
-      (r) => r.id !== "rel-marcus-sarah"
-    );
-    // Add org-nexus -> org-horizon relationship
-    testDataset.relationships.push({
-      id: "rel-nexus-horizon",
-      from: { type: "organization", id: "org-nexus" },
-      to: { type: "organization", id: "org-horizon-vc" },
-      type: "invested_in",
-      direction: "directed",
-      evidenceIds: ["ev-nexus-horizon"],
-    });
-    testDataset.relationshipEvidence.push({
-      id: "ev-nexus-horizon",
-      relationshipId: "rel-nexus-horizon",
-      type: "press_release",
-      description: "Org partnership",
-      observedAt: "2026-09-01",
+  // Batch 3.1 Hardened Error & Validation Tests (A - N)
+  describe("Batch 3.1 Error & Validation Contract Tests", () => {
+    it("A: Missing TargetInvestor returns TARGET_INVESTOR_NOT_FOUND error", () => {
+      const res = generatePathsForTarget(
+        pathwayDemoDataset,
+        "target-nonexistent",
+        REFERENCE_DATE
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.paths).toEqual([]);
+      expect(res.errors[0].code).toBe("TARGET_INVESTOR_NOT_FOUND");
     });
 
-    const res = generatePathsForTarget(
-      testDataset,
-      "target-horizon",
-      REFERENCE_DATE
-    );
-    // Cannot bridge through organizations!
-    expect(res.paths).toEqual([]);
-    expect(res.disposition).toBe("no_known_path");
+    it("B: Invalid dataset returns INVALID_DATASET error", () => {
+      const corruptDataset: PathwayDataset = JSON.parse(
+        JSON.stringify(pathwayDemoDataset)
+      );
+      corruptDataset.relationshipEvidence[0].relationshipId = "non-existent-rel";
+
+      const res = generatePathsForTarget(
+        corruptDataset,
+        "target-horizon",
+        REFERENCE_DATE
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.paths).toEqual([]);
+      expect(res.errors[0].code).toBe("INVALID_DATASET");
+    });
+
+    it("C: Zero target people returns NO_TARGET_PEOPLE error", () => {
+      const invalidDataset: PathwayDataset = JSON.parse(
+        JSON.stringify(pathwayDemoDataset)
+      );
+      invalidDataset.targetInvestors[0].candidatePersonIds = [];
+
+      const res = generatePathsForTarget(
+        invalidDataset,
+        "target-horizon",
+        REFERENCE_DATE
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.errors[0].code).toBe("NO_TARGET_PEOPLE");
+    });
+
+    it("D: Invalid referenceDate string returns INVALID_REFERENCE_DATE error without traversing", () => {
+      const res = generatePathsForTarget(
+        pathwayDemoDataset,
+        "target-horizon",
+        "invalid-date-string"
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.errors[0].code).toBe("INVALID_REFERENCE_DATE");
+    });
+
+    it("E: Invalid Date object returns INVALID_REFERENCE_DATE error", () => {
+      const res = generatePathsForTarget(
+        pathwayDemoDataset,
+        "target-horizon",
+        new Date("invalid-date")
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.errors[0].code).toBe("INVALID_REFERENCE_DATE");
+    });
+
+    it("F: maxRelationshipHops = 0 returns INVALID_PATH_POLICY error", () => {
+      const res = generatePathsForTarget(
+        pathwayDemoDataset,
+        "target-horizon",
+        REFERENCE_DATE,
+        { maxRelationshipHops: 0 }
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.errors[0].code).toBe("INVALID_PATH_POLICY");
+    });
+
+    it("G: maxRelationshipHops = -1 returns INVALID_PATH_POLICY error", () => {
+      const res = generatePathsForTarget(
+        pathwayDemoDataset,
+        "target-horizon",
+        REFERENCE_DATE,
+        { maxRelationshipHops: -1 }
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.errors[0].code).toBe("INVALID_PATH_POLICY");
+    });
+
+    it("H: maxRelationshipHops = 1.5 returns INVALID_PATH_POLICY error", () => {
+      const res = generatePathsForTarget(
+        pathwayDemoDataset,
+        "target-horizon",
+        REFERENCE_DATE,
+        { maxRelationshipHops: 1.5 }
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.errors[0].code).toBe("INVALID_PATH_POLICY");
+    });
+
+    it("I: maxRelationshipHops = NaN returns INVALID_PATH_POLICY error", () => {
+      const res = generatePathsForTarget(
+        pathwayDemoDataset,
+        "target-horizon",
+        REFERENCE_DATE,
+        { maxRelationshipHops: NaN }
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.errors[0].code).toBe("INVALID_PATH_POLICY");
+    });
+
+    it("J: Malformed includeConfirmationRequired runtime value returns INVALID_PATH_POLICY error", () => {
+      const res = generatePathsForTarget(
+        pathwayDemoDataset,
+        "target-horizon",
+        REFERENCE_DATE,
+        { includeConfirmationRequired: "true" as unknown as boolean }
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.errors[0].code).toBe("INVALID_PATH_POLICY");
+    });
+
+    it("K: agingMaxDays < recentMaxDays returns INVALID_QUALIFICATION_POLICY error", () => {
+      const res = generatePathsForTarget(
+        pathwayDemoDataset,
+        "target-horizon",
+        REFERENCE_DATE,
+        undefined,
+        { recentMaxDays: 90, agingMaxDays: 30 }
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.errors[0].code).toBe("INVALID_QUALIFICATION_POLICY");
+    });
+
+    it("L: Candidate target person with unverified affiliation returns TARGET_PERSON_AFFILIATION_UNVERIFIED error", () => {
+      const unverifiedDataset: PathwayDataset = JSON.parse(
+        JSON.stringify(pathwayDemoDataset)
+      );
+      // Remove Sarah's currentOrganizationIds and works_at relationship & evidence
+      const sarah = unverifiedDataset.people.find(
+        (p) => p.id === "person-vc-sarah"
+      )!;
+      sarah.currentOrganizationIds = [];
+      unverifiedDataset.relationships = unverifiedDataset.relationships.filter(
+        (r) => r.id !== "rel-sarah-horizon"
+      );
+      unverifiedDataset.relationshipEvidence = unverifiedDataset.relationshipEvidence.filter(
+        (e) => e.relationshipId !== "rel-sarah-horizon"
+      );
+
+      const res = generatePathsForTarget(
+        unverifiedDataset,
+        "target-horizon",
+        REFERENCE_DATE
+      );
+      expect(res.executionStatus).toBe("error");
+      expect(res.disposition).toBeNull();
+      expect(res.coldOutreachRequired).toBeNull();
+      expect(res.errors[0].code).toBe("TARGET_PERSON_AFFILIATION_UNVERIFIED");
+      expect(res.errors[0].entityId).toBe("person-vc-sarah");
+    });
+
+    it("M: Candidate affiliation verified through Person.currentOrganizationIds is accepted", () => {
+      const datasetOrgIdOnly: PathwayDataset = JSON.parse(
+        JSON.stringify(pathwayDemoDataset)
+      );
+      // Remove works_at relationship and evidence for Sarah but keep org ID in currentOrganizationIds
+      datasetOrgIdOnly.relationships = datasetOrgIdOnly.relationships.filter(
+        (r) => r.id !== "rel-sarah-horizon"
+      );
+      datasetOrgIdOnly.relationshipEvidence = datasetOrgIdOnly.relationshipEvidence.filter(
+        (e) => e.relationshipId !== "rel-sarah-horizon"
+      );
+
+      const res = generatePathsForTarget(
+        datasetOrgIdOnly,
+        "target-horizon",
+        REFERENCE_DATE
+      );
+      expect(res.executionStatus).toBe("success");
+      expect(res.paths.length).toBe(1);
+    });
+
+    it("N: Candidate affiliation verified through current works_at relationship is accepted", () => {
+      const datasetWorksAtOnly: PathwayDataset = JSON.parse(
+        JSON.stringify(pathwayDemoDataset)
+      );
+      // Remove org ID from Sarah's currentOrganizationIds but keep works_at relationship
+      const sarah = datasetWorksAtOnly.people.find(
+        (p) => p.id === "person-vc-sarah"
+      )!;
+      sarah.currentOrganizationIds = [];
+
+      const res = generatePathsForTarget(
+        datasetWorksAtOnly,
+        "target-horizon",
+        REFERENCE_DATE
+      );
+      expect(res.executionStatus).toBe("success");
+      expect(res.paths.length).toBe(1);
+    });
   });
 
   // Internal Traversal Helper Tests

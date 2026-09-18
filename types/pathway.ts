@@ -3,13 +3,14 @@
  *
  * Batch 1 — Domain Model and Dataset Contract
  * Batch 2 — Deterministic Relationship Qualification
+ * Batch 3 — Deterministic Path Generation & Traversal Engine
  *
  * Core Principle:
  * DATA -> EVIDENCE -> DECISION -> ACTION -> OUTCOME -> LEARNING
  *
- * This layer represents raw facts, observed evidence, and deterministic
- * relationship introduction-qualification decisions.
- * It does NOT score relationships, assess warmth, or generate paths.
+ * This layer represents raw facts, observed evidence, deterministic
+ * relationship qualification, and deterministic person-to-person path generation.
+ * It does NOT score relationships, assess warmth, perform path ranking, or select target people.
  */
 
 export interface EntityReference {
@@ -179,12 +180,35 @@ export interface PathCandidate {
   requiresConfirmationRelationshipIds: string[];
 }
 
+export type PathGenerationExecutionStatus = "success" | "error";
+
+export type PathGenerationErrorCode =
+  | "INVALID_DATASET"
+  | "TARGET_INVESTOR_NOT_FOUND"
+  | "CAMPAIGN_NOT_FOUND"
+  | "NO_FOUNDERS"
+  | "FOUNDER_NOT_FOUND"
+  | "NO_TARGET_PEOPLE"
+  | "TARGET_PERSON_NOT_FOUND"
+  | "TARGET_PERSON_AFFILIATION_UNVERIFIED"
+  | "INVALID_REFERENCE_DATE"
+  | "INVALID_PATH_POLICY"
+  | "INVALID_QUALIFICATION_POLICY";
+
+export interface PathGenerationError {
+  code: PathGenerationErrorCode;
+  message: string;
+  entityId?: string;
+}
+
 export type PathGenerationDisposition =
   | "eligible_path_available"
   | "confirmation_path_available"
+  | "confirmation_paths_filtered"
   | "no_known_path";
 
 export interface PathGenerationResult {
+  executionStatus: PathGenerationExecutionStatus;
   targetInvestorId: string;
   campaignId: string;
   sourceFounderPersonIds: string[];
@@ -192,9 +216,10 @@ export interface PathGenerationResult {
   paths: PathCandidate[];
   eligiblePathCount: number;
   confirmationRequiredPathCount: number;
-  disposition: PathGenerationDisposition;
-  coldOutreachRequired: boolean;
-  errors: string[];
+  filteredConfirmationPathCount: number;
+  disposition: PathGenerationDisposition | null;
+  coldOutreachRequired: boolean | null;
+  errors: PathGenerationError[];
 }
 
 export interface PathScore {
