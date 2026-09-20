@@ -1,0 +1,8 @@
+personId,firstName,lastName,fullName,linkedinUrl,currentOrganizationIds,location
+person-founder-elena,Elena,Vance,Elena Vance,https://linkedin.example.com/in/elena-vance-nexus,org-nexus,"San Francisco, CA"
+person-advisor-marcus,Marcus,Thorne,Marcus Thorne,https://linkedin.example.com/in/marcus-thorne-advisor,org-stellar-advisory,"San Francisco, CA"
+person-vc-sarah,Sarah,Chen,Sarah Chen,https://linkedin.example.com/in/sarah-chen-horizon,org-horizon-vc,"San Francisco, CA"
+person-vc-david,David,Miller,David Miller,https://linkedin.example.com/in/david-miller-beacon,org-beacon-cap,"Menlo Park, CA"
+person-colleague-tom,Tom,Wright,Tom Wright,https://linkedin.example.com/in/tom-wright-pastwork,org-acme-corp,"San Jose, CA"
+person-vc-clara,Clara,Oswald,Clara Oswald,https://linkedin.example.com/in/clara-oswald-summit,org-summit-partners,"New York, NY"
+person-vc-isabel,Isabel,Torres,Isabel Torres,https://linkedin.example.com/in/isabel-torres-aurora,org-aurora-ventures,"Boston, MA"

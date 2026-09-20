@@ -1,0 +1,2 @@
+relationshipId,fromType,fromId,toType,toId,type,direction,evidenceIds,startedAt,endedAt,lastObservedAt
+rel-synthetic-1,person,person-synthetic-founder,person,person-synthetic-vc,linkedin_connection,bidirectional,ev-synthetic-1,2026-01-01,,2026-09-01

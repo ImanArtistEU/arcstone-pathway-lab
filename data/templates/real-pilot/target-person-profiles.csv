@@ -1,0 +1,2 @@
+targetInvestorId,personId,roleTitle,investmentRole,stageFocus,sectorFocus,geographyFocus,observedAt,sourceName,sourceUrl
+target-synthetic-horizon,person-synthetic-vc,Partner,lead_investor,Seed|Series A,Enterprise Software|AI,"San Francisco, CA|global",2026-09-01T00:00:00.000Z,Firm Website,https://horizon.example.com/team

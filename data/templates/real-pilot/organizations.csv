@@ -1,0 +1,3 @@
+organizationId,name,type,website,geography
+org-synthetic-startup,Acme AI,startup,https://acme-ai-synthetic.example.com,"San Francisco, CA"
+org-synthetic-investor,Horizon Ventures,vc_fund,https://horizon-vc-synthetic.example.com,"San Francisco, CA"

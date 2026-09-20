@@ -111,7 +111,7 @@ $$\mathbf{MISSING\ STARTUP\ RECORD} \neq \mathbf{ORGANIZATION\ FALLBACK}$$
 
 ## Current status
 
-Batch 6.1 — Target Person Selection contract hardened.
+Batch 7 — Private Real-Data Pilot Harness implemented.
 
 ## Graph Semantics & Path Traversal
 
@@ -147,6 +147,8 @@ Path Rejection [IMPLEMENTED]
 Path Scoring [IMPLEMENTED]
       ↓
 Target Person Selection [IMPLEMENTED]
+      ↓
+Real-Data Pilot Harness [IMPLEMENTED]
       ↓
 Explanation / Recommended Action [PLANNED]
       ↓

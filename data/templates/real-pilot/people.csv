@@ -1,0 +1,3 @@
+personId,firstName,lastName,fullName,linkedinUrl,currentOrganizationIds,location
+person-synthetic-founder,Elena,Vance,Elena Vance,https://linkedin.example.com/in/elena-vance,org-synthetic-startup,"San Francisco, CA"
+person-synthetic-vc,Sarah,Chen,Sarah Chen,https://linkedin.example.com/in/sarah-chen,org-synthetic-investor,"San Francisco, CA"

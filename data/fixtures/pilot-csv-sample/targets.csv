@@ -1,0 +1,5 @@
+targetInvestorId,campaignId,investorOrganizationId,candidatePersonIds,status
+target-horizon,campaign-nexus-seed,org-horizon-vc,person-vc-sarah,ready
+target-beacon,campaign-nexus-seed,org-beacon-cap,person-vc-david,ready
+target-summit,campaign-nexus-seed,org-summit-partners,person-vc-clara,ready
+target-aurora,campaign-nexus-seed,org-aurora-ventures,person-vc-isabel,ready

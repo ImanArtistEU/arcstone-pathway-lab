@@ -1,0 +1,2 @@
+targetInvestorId,campaignId,investorOrganizationId,candidatePersonIds,status
+target-synthetic-horizon,campaign-synthetic-example,org-synthetic-investor,person-synthetic-vc,ready

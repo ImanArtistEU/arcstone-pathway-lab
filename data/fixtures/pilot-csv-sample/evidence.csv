@@ -1,0 +1,15 @@
+evidenceId,relationshipId,type,description,observedAt,sourceName,sourceUrl,interactionOccurredAt,interactionReciprocity,interactionStatus
+ev-founder-nexus-web,rel-elena-nexus,company_website,Nexus AI website lists Elena Vance as Founder,2026-09-01T00:00:00.000Z,Nexus Website,https://nexus-ai-example.com/about,,,
+ev-elena-marcus-agreement,rel-elena-marcus,user_reported,Signed advisory agreement between Elena Vance and Marcus Thorne,2023-01-15T00:00:00.000Z,Nexus Doc,https://nexus.example.com/docs/marcus-advisory.pdf,,,
+ev-elena-marcus-website,rel-elena-marcus,company_website,Nexus AI team page lists Marcus Thorne as Strategic Advisor,2026-09-01T00:00:00.000Z,Nexus Website,https://nexus-ai-example.com/team,,,
+ev-elena-marcus-meetings,rel-elena-marcus,meeting_history,Bi-weekly strategic advisory sync meetings between Elena Vance and Marcus Thorne,2026-08-28T14:00:00.000Z,Google Calendar,https://calendar.example.com/event/nexus-sync,2026-08-28T14:00:00.000Z,two_way,confirmed
+ev-marcus-sarah-press,rel-marcus-sarah,news_article,Press release announcing co-investment in AI seed round,2021-06-01T00:00:00.000Z,TechCrunch,https://techcrunch.example.com/article/ai-seed,,,
+ev-marcus-sarah-board,rel-marcus-sarah,user_reported,Board deck listing Marcus Thorne and Sarah Chen as co-investor observers,2026-05-10T00:00:00.000Z,Board Deck,https://nexus.example.com/docs/board-2026-q2.pdf,,,
+ev-marcus-sarah-email,rel-marcus-sarah,email_history,Email thread discussing prospective deal introductions,2026-08-15T10:30:00.000Z,Gmail,https://mail.example.com/thread/18392,2026-08-15T10:30:00.000Z,two_way,confirmed
+ev-sarah-horizon-website,rel-sarah-horizon,company_website,Horizon Ventures team directory lists Sarah Chen as Partner,2026-09-01T00:00:00.000Z,Horizon Website,https://horizon-vc-example.com/team,,,
+ev-elena-david-linkedin,rel-elena-david,linkedin,LinkedIn connection between Elena Vance and David Miller,2026-08-01T00:00:00.000Z,LinkedIn Export,https://linkedin.example.com/in/david-miller,,,
+ev-david-beacon-website,rel-david-beacon,company_website,Beacon Capital team directory lists David Miller as Partner,2026-09-01T00:00:00.000Z,Beacon Website,https://beacon-cap-example.com/team,,,
+ev-elena-tom-pastwork,rel-elena-tom,linkedin,Past employment record at Acme Software,2019-08-31T00:00:00.000Z,LinkedIn Export,https://linkedin.example.com/in/tom-wright,,,
+ev-tom-clara-pastwork,rel-tom-clara,linkedin,Past employment record at Acme Software,2016-05-30T00:00:00.000Z,LinkedIn Export,https://linkedin.example.com/in/clara-oswald,,,
+ev-clara-summit-website,rel-clara-summit,company_website,Summit Ridge team directory lists Clara Oswald as Partner,2026-09-01T00:00:00.000Z,Summit Website,https://summit-ridge-example.com/team,,,
+ev-isabel-aurora-website,rel-isabel-aurora,company_website,Aurora Global team directory lists Isabel Torres as Partner,2026-09-01T00:00:00.000Z,Aurora Website,https://aurora-global-example.com/team,,,

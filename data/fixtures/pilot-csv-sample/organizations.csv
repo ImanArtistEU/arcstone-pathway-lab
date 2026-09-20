@@ -1,0 +1,8 @@
+organizationId,name,type,website,geography
+org-nexus,Nexus AI,startup,https://nexus-ai-example.com,"San Francisco, CA"
+org-horizon-vc,Horizon Ventures,vc_fund,https://horizon-vc-example.com,"San Francisco, CA"
+org-beacon-cap,Beacon Capital,vc_fund,https://beacon-cap-example.com,"Menlo Park, CA"
+org-summit-partners,Summit Ridge Capital,vc_fund,https://summit-ridge-example.com,"New York, NY"
+org-aurora-ventures,Aurora Global Ventures,vc_fund,https://aurora-global-example.com,"Boston, MA"
+org-stellar-advisory,Stellar Strategic Advisory,advisory_firm,https://stellar-advisory-example.com,"San Francisco, CA"
+org-acme-corp,Acme Legacy Software,corporate,https://acme-legacy-example.com,"San Jose, CA"

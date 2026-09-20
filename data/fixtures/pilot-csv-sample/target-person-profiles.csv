@@ -1,0 +1,5 @@
+targetInvestorId,personId,roleTitle,investmentRole,stageFocus,sectorFocus,geographyFocus,observedAt,sourceName,sourceUrl
+target-horizon,person-vc-sarah,Partner,lead_investor,Seed|Series A,Enterprise Software|AI,"San Francisco, CA|global",2026-09-01T00:00:00.000Z,Horizon Website,https://horizon-vc-example.com/team/sarah
+target-beacon,person-vc-david,Partner,lead_investor,Seed|Series A,Enterprise Software|SaaS,"San Francisco, CA|global",2026-09-01T00:00:00.000Z,Beacon Website,https://beacon-cap-example.com/team/david
+target-summit,person-vc-clara,Partner,lead_investor,Seed|Series A,Enterprise Software|Fintech,"San Francisco, CA|global",2026-09-01T00:00:00.000Z,Summit Website,https://summit-ridge-example.com/team/clara
+target-aurora,person-vc-isabel,Partner,lead_investor,Seed|Series A,Enterprise Software|DeepTech,"San Francisco, CA|global",2026-09-01T00:00:00.000Z,Aurora Website,https://aurora-global-example.com/team/isabel
