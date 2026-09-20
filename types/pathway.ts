@@ -367,14 +367,6 @@ export interface PathwayDataset {
   targetInvestors: TargetInvestor[];
 }
 
-export interface PathwayAnalysisResult {
-  targetInvestorId: string;
-  candidatePaths: PathCandidate[];
-  recommendedPathId?: string;
-  coldOutreachRequired: boolean;
-  explanation?: string;
-}
-
 // ============================================================================
 // RELATIONSHIP QUALIFICATION (Batch 2)
 // ============================================================================

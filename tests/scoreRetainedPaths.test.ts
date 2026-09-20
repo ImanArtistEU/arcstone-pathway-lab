@@ -783,6 +783,275 @@ describe("Deterministic Path Scoring / Priority Index (Batch 5)", () => {
     expect(res.scoredPaths[0].path.id).toBe("path-A-lower-score");
     expect(res.scoredPaths[1].path.id).toBe("path-B-higher-score");
   });
+
+  // Explanation Accuracy Tests (67 - 71)
+  it("67: 2-hop eligible route with founder-asserted evidence does not claim confirmed direct interaction", () => {
+    const steps = [
+      createMockStep("r1", "eligible", ["RECENT_INTERNAL_EVIDENCE"], "recent"),
+      createMockStep("r2", "eligible", ["RECENT_INTERNAL_EVIDENCE"], "recent"),
+    ];
+    const rej = createMockPathRejectionResult(steps);
+    const res = scoreRetainedPaths(rej);
+
+    expect(res.scoredPaths[0].score.explanation).not.toContain("confirmed direct interaction");
+    expect(res.scoredPaths[0].score.explanation).toContain("Recent founder-asserted internal evidence");
+  });
+
+  it("68: 3-hop fully eligible recent-direct route does not hardcode 'Both hops'", () => {
+    const steps = [
+      createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent"),
+      createMockStep("r2", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent"),
+      createMockStep("r3", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent"),
+    ];
+    const rej = createMockPathRejectionResult(steps);
+    const res = scoreRetainedPaths(rej);
+
+    expect(res.scoredPaths[0].score.explanation).not.toContain("Both hops");
+    expect(res.scoredPaths[0].score.explanation).toContain("Route contains 3 relationship hops");
+  });
+
+  it("69: Beacon explanation contains platform-only, requiring confirmation, and uncalibrated warning", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-beacon", REFERENCE_DATE);
+    const rej = applyPathRejection(gen);
+    const res = scoreRetainedPaths(rej);
+
+    const exp = res.scoredPaths[0].score.explanation;
+    expect(exp).toContain("Platform-only");
+    expect(exp).toContain("1 requiring confirmation");
+    expect(exp).toContain("This is an uncalibrated heuristic, not a success probability.");
+  });
+
+  it("70: Horizon explanation contains direct recent evidence description and uncalibrated warning", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const rej = applyPathRejection(gen);
+    const res = scoreRetainedPaths(rej);
+
+    const exp = res.scoredPaths[0].score.explanation;
+    expect(exp).toContain("Recent confirmed direct interaction");
+    expect(exp).toContain("This is an uncalibrated heuristic, not a success probability.");
+  });
+
+  it("71: Every scored path explanation contains explicit uncalibrated warning", () => {
+    const genH = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const resH = scoreRetainedPaths(applyPathRejection(genH));
+
+    const genB = generatePathsForTarget(pathwayDemoDataset, "target-beacon", REFERENCE_DATE);
+    const resB = scoreRetainedPaths(applyPathRejection(genB));
+
+    for (const sp of [...resH.scoredPaths, ...resB.scoredPaths]) {
+      expect(sp.score.explanation).toContain("This is an uncalibrated heuristic, not a success probability.");
+    }
+  });
+
+  // Deep Immutability Tests (72 - 76)
+  it("72: Mutating scored path nodes does not alter original retained path", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const rej = applyPathRejection(gen);
+    const res = scoreRetainedPaths(rej);
+
+    const originalNodeId = rej.retainedPaths[0].nodes[0].id;
+    res.scoredPaths[0].path.nodes[0].id = "MUTATED_NODE_ID";
+
+    expect(rej.retainedPaths[0].nodes[0].id).toBe(originalNodeId);
+  });
+
+  it("73: Mutating scored path relationshipIds does not alter original retained path", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const rej = applyPathRejection(gen);
+    const res = scoreRetainedPaths(rej);
+
+    const originalRelCount = rej.retainedPaths[0].relationshipIds.length;
+    res.scoredPaths[0].path.relationshipIds.push("MUTATED_REL_ID");
+
+    expect(rej.retainedPaths[0].relationshipIds.length).toBe(originalRelCount);
+  });
+
+  it("74: Mutating scored path requiresConfirmationRelationshipIds does not alter original retained path", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-beacon", REFERENCE_DATE);
+    const rej = applyPathRejection(gen);
+    const res = scoreRetainedPaths(rej);
+
+    const originalCount = rej.retainedPaths[0].requiresConfirmationRelationshipIds.length;
+    res.scoredPaths[0].path.requiresConfirmationRelationshipIds.push("MUTATED_REQ_ID");
+
+    expect(rej.retainedPaths[0].requiresConfirmationRelationshipIds.length).toBe(originalCount);
+  });
+
+  it("75: Mutating scored path qualificationReasonCodes does not alter original retained path", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const rej = applyPathRejection(gen);
+    const res = scoreRetainedPaths(rej);
+
+    const originalCodesCount = rej.retainedPaths[0].steps[0].qualificationReasonCodes.length;
+    res.scoredPaths[0].path.steps[0].qualificationReasonCodes.push("MUTATED_CODE" as any);
+
+    expect(rej.retainedPaths[0].steps[0].qualificationReasonCodes.length).toBe(originalCodesCount);
+  });
+
+  it("76: Mutating scored path qualificationEvidenceSummary does not alter original retained path", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const rej = applyPathRejection(gen);
+    const res = scoreRetainedPaths(rej);
+
+    const originalTotal = rej.retainedPaths[0].steps[0].qualificationEvidenceSummary.total;
+    res.scoredPaths[0].path.steps[0].qualificationEvidenceSummary.total = 999;
+
+    expect(rej.retainedPaths[0].steps[0].qualificationEvidenceSummary.total).toBe(originalTotal);
+  });
+
+  // Malformed Retained Path Validation Tests (77 - 88)
+  it("77: Malformed retained path with status = 'rejected' fails scoring with error disposition", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0] as any).status = "rejected";
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.executionStatus).toBe("error");
+    expect(res.disposition).toBe("error");
+    expect(res.scoredPaths).toEqual([]);
+    expect(res.errors[0]).toContain("rejected paths cannot be scored");
+  });
+
+  it("78: Malformed retained path with zero steps fails scoring with error disposition", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0] as any).steps = [];
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.executionStatus).toBe("error");
+    expect(res.disposition).toBe("error");
+    expect(res.scoredPaths).toEqual([]);
+    expect(res.errors[0]).toContain("path contains zero traversal steps");
+  });
+
+  it("79: Malformed retained path with relationshipIds length mismatch fails scoring", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0] as any).relationshipIds = ["r1", "r2_extra"];
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.executionStatus).toBe("error");
+    expect(res.disposition).toBe("error");
+    expect(res.scoredPaths).toEqual([]);
+    expect(res.errors[0]).toContain("relationshipIds length does not match steps length");
+  });
+
+  it("80: Malformed retained path with nodes length mismatch fails scoring", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0] as any).nodes = [{ type: "person", id: "p1" }];
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.executionStatus).toBe("error");
+    expect(res.disposition).toBe("error");
+    expect(res.scoredPaths).toEqual([]);
+    expect(res.errors[0]).toContain("nodes length does not match steps length + 1");
+  });
+
+  it("81: Invalid qualification status at runtime fails scoring", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0].steps[0] as any).qualificationStatus = "invalid_status";
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.executionStatus).toBe("error");
+    expect(res.disposition).toBe("error");
+    expect(res.scoredPaths).toEqual([]);
+    expect(res.errors[0]).toContain("invalid qualificationStatus");
+  });
+
+  it("82: Invalid qualificationRecency at runtime fails scoring", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0].steps[0] as any).qualificationRecency = "invalid_recency";
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.executionStatus).toBe("error");
+    expect(res.disposition).toBe("error");
+    expect(res.scoredPaths).toEqual([]);
+    expect(res.errors[0]).toContain("invalid qualificationRecency");
+  });
+
+  it("83: Missing qualificationEvidenceSummary at runtime fails scoring", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0].steps[0] as any).qualificationEvidenceSummary = null;
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.executionStatus).toBe("error");
+    expect(res.disposition).toBe("error");
+    expect(res.scoredPaths).toEqual([]);
+    expect(res.errors[0]).toContain("missing qualificationEvidenceSummary");
+  });
+
+  it("84: NaN evidence summary count fails scoring", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0].steps[0].qualificationEvidenceSummary as any).total = NaN;
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.executionStatus).toBe("error");
+    expect(res.disposition).toBe("error");
+    expect(res.scoredPaths).toEqual([]);
+    expect(res.errors[0]).toContain("invalid qualificationEvidenceSummary field");
+  });
+
+  it("85: Negative evidence summary count fails scoring", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0].steps[0].qualificationEvidenceSummary as any).total = -1;
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.executionStatus).toBe("error");
+    expect(res.disposition).toBe("error");
+    expect(res.scoredPaths).toEqual([]);
+    expect(res.errors[0]).toContain("invalid qualificationEvidenceSummary field");
+  });
+
+  it("86: Fractional evidence summary count fails scoring", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0].steps[0].qualificationEvidenceSummary as any).total = 2.5;
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.executionStatus).toBe("error");
+    expect(res.disposition).toBe("error");
+    expect(res.scoredPaths).toEqual([]);
+    expect(res.errors[0]).toContain("invalid qualificationEvidenceSummary field");
+  });
+
+  it("87: Malformed path never returns a scored path", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0] as any).steps = [];
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.scoredPaths).toBeDefined();
+    expect(res.scoredPaths.length).toBe(0);
+  });
+
+  it("88: Malformed path never returns no_retained_paths disposition", () => {
+    const rej = createMockPathRejectionResult([createMockStep("r1", "eligible", ["RECENT_DIRECT_INTERACTION"], "recent")]);
+    (rej.retainedPaths[0] as any).steps = [];
+
+    const res = scoreRetainedPaths(rej);
+    expect(res.disposition).toBe("error");
+    expect(res.disposition).not.toBe("no_retained_paths");
+  });
+
+  // Finite Metric Score Test (89)
+  it("89: All score metrics are finite integers between 0 and 100", () => {
+    const genH = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const resH = scoreRetainedPaths(applyPathRejection(genH));
+
+    const genB = generatePathsForTarget(pathwayDemoDataset, "target-beacon", REFERENCE_DATE);
+    const resB = scoreRetainedPaths(applyPathRejection(genB));
+
+    for (const sp of [...resH.scoredPaths, ...resB.scoredPaths]) {
+      const metrics = [
+        sp.score.overallPriorityIndex,
+        sp.score.relationshipCredibility,
+        sp.score.temporalFreshness,
+        sp.score.confirmationReadiness,
+        sp.score.pathEfficiency,
+      ];
+      for (const m of metrics) {
+        expect(Number.isFinite(m)).toBe(true);
+        expect(Number.isInteger(m)).toBe(true);
+        expect(m).toBeGreaterThanOrEqual(0);
+        expect(m).toBeLessThanOrEqual(100);
+      }
+    }
+  });
 });
 
 // Helper functions for mock test objects

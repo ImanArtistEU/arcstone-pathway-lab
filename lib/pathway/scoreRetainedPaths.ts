@@ -21,6 +21,9 @@ import {
  * 4. REJECTED PATHS != SCOREABLE PATHS: Rejected paths never receive scores.
  * 5. WEAKEST LINK MATTERS: Path-level credibility and freshness are governed by the minimum step score.
  * 6. ORDER PRESERVATION: Retained path order is strictly preserved (SCORING != RANKING).
+ * 7. EXPLANATION MUST MATCH EVIDENCE: Derived directly from step-level computed evidence.
+ * 8. MALFORMED PATH != SCOREABLE PATH: Fails closed on malformed input data.
+ * 9. SCORED OUTPUT IS IMMUTABLE: Deep-cloned to protect upstream state.
  */
 export function scoreRetainedPaths(
   rejectionResult: PathRejectionResult,
@@ -94,7 +97,24 @@ export function scoreRetainedPaths(
     };
   }
 
-  // 5. Score ONLY Retained Paths (Preserving upstream order)
+  // 5. Validate Retained Paths Shape Before Scoring (Fail closed on malformed data)
+  for (const path of rejectionResult.retainedPaths) {
+    const pathValidationError = validateRetainedPath(path);
+    if (pathValidationError) {
+      return {
+        executionStatus: "error",
+        targetInvestorId: rejectionResult.targetInvestorId,
+        upstreamRejectionDisposition: rejectionResult.disposition,
+        inputRetainedPathCount: rejectionResult.retainedPaths.length,
+        scoredPaths: [],
+        disposition: "error",
+        calibrationStatus: "uncalibrated_heuristic",
+        errors: [pathValidationError],
+      };
+    }
+  }
+
+  // 6. Score ONLY Retained Paths (Preserving upstream order)
   const scoredPaths: ScoredPath[] = rejectionResult.retainedPaths.map(
     (path) => {
       const stepScores: PathStepScore[] = [];
@@ -123,16 +143,8 @@ export function scoreRetainedPaths(
             stepExplanation = "Eligible relationship with verified evidence.";
           }
         } else {
-          // confirmation_required
-          const summary = step.qualificationEvidenceSummary || {
-            totalEvidenceCount: 0,
-            confirmedTwoWayInteraction: 0,
-            founderAsserted: 0,
-            unconfirmedInteraction: 0,
-            platformSignal: 0,
-            publicContext: 0,
-            other: 0,
-          };
+          // confirmation_required (validated upfront)
+          const summary = step.qualificationEvidenceSummary;
 
           if (summary.confirmedTwoWayInteraction > 0) {
             stepCredibility = policy.confirmedHistoricalInteractionScore;
@@ -194,8 +206,8 @@ export function scoreRetainedPaths(
       // Weakest Link Principle for Credibility
       const pathCredibility = Math.min(...stepCredibilities);
       const bottleneckStepIndex = stepCredibilities.indexOf(pathCredibility);
-      const bottleneckRelationshipId =
-        path.steps[bottleneckStepIndex]?.relationshipId;
+      const bottleneckStep = stepScores[bottleneckStepIndex];
+      const bottleneckRelationshipId = bottleneckStep?.relationshipId;
 
       // Weakest Link Principle for Temporal Freshness
       const pathFreshness = Math.min(...stepFreshnesses);
@@ -231,19 +243,14 @@ export function scoreRetainedPaths(
         Math.min(100, Math.round(rawIndex))
       );
 
-      // Deterministic Explanation
-      let detailsText = "";
-      if (confirmationRequiredHopCount > 0) {
-        detailsText = `The route is direct or multi-hop with ${confirmationRequiredHopCount} confirmation-required hop${
-          confirmationRequiredHopCount > 1 ? "s" : ""
-        }.`;
-      } else if (relationshipHopCount > 1) {
-        detailsText = `Both hops have recent confirmed direct interaction; the ${relationshipHopCount}-hop route carries a modest path-efficiency penalty.`;
-      } else {
-        detailsText = "Direct route with confirmed interaction.";
-      }
+      // Refactored Deterministic Explanation
+      const bottleneckText = bottleneckStep
+        ? `Weakest credibility step is ${bottleneckStep.relationshipId}: ${bottleneckStep.explanation}.`
+        : "";
 
-      const pathExplanation = `Priority index ${overallPriorityIndex}/100. ${detailsText} This is an uncalibrated heuristic, not a success probability.`;
+      const pathExplanation = `Priority index ${overallPriorityIndex}/100. Route contains ${relationshipHopCount} relationship hop${
+        relationshipHopCount === 1 ? "" : "s"
+      }, with ${confirmationRequiredHopCount} requiring confirmation. ${bottleneckText} Path efficiency is ${pathEfficiency}/100. This is an uncalibrated heuristic, not a success probability.`;
 
       const score: PathScore = {
         pathId: path.id,
@@ -261,9 +268,14 @@ export function scoreRetainedPaths(
         explanation: pathExplanation,
       };
 
-      // Clone path candidate object to enforce immutability
+      // Fully deep-clone path candidate object to enforce immutability
       const clonedPath: PathCandidate = {
         ...path,
+        nodes: path.nodes.map((node) => ({ ...node })),
+        relationshipIds: [...path.relationshipIds],
+        requiresConfirmationRelationshipIds: [
+          ...path.requiresConfirmationRelationshipIds,
+        ],
         steps: path.steps.map((s) => ({
           ...s,
           qualificationReasonCodes: [...s.qualificationReasonCodes],
@@ -288,6 +300,95 @@ export function scoreRetainedPaths(
     calibrationStatus: "uncalibrated_heuristic",
     errors: [],
   };
+}
+
+function validateRetainedPath(path: PathCandidate): string | null {
+  if (!path || typeof path !== "object") {
+    return "Invalid retained path: path object is missing or null.";
+  }
+
+  const pathId = path.id || "unknown";
+
+  if (path.status === "rejected") {
+    return `Invalid retained path "${pathId}": rejected paths cannot be scored.`;
+  }
+
+  if (path.status !== "eligible" && path.status !== "candidate") {
+    return `Invalid retained path "${pathId}": invalid status "${path.status}".`;
+  }
+
+  if (!Array.isArray(path.steps) || path.steps.length === 0) {
+    return `Invalid retained path "${pathId}": path contains zero traversal steps.`;
+  }
+
+  if (
+    !Array.isArray(path.relationshipIds) ||
+    path.relationshipIds.length !== path.steps.length
+  ) {
+    return `Invalid retained path "${pathId}": relationshipIds length does not match steps length.`;
+  }
+
+  if (
+    !Array.isArray(path.nodes) ||
+    path.nodes.length !== path.steps.length + 1
+  ) {
+    return `Invalid retained path "${pathId}": nodes length does not match steps length + 1.`;
+  }
+
+  const validRecencies = new Set(["recent", "aging", "stale", "unknown"]);
+  const requiredSummaryFields = [
+    "total",
+    "directInteraction",
+    "founderAsserted",
+    "publicContext",
+    "platformSignal",
+    "confirmedTwoWayInteraction",
+    "oneWayInteraction",
+    "unconfirmedInteraction",
+  ] as const;
+
+  for (let i = 0; i < path.steps.length; i++) {
+    const step = path.steps[i];
+    const stepRelId = step?.relationshipId || `step-${i}`;
+
+    if (!step || typeof step !== "object") {
+      return `Invalid retained path "${pathId}": step at index ${i} is missing.`;
+    }
+
+    if (
+      step.qualificationStatus !== "eligible" &&
+      step.qualificationStatus !== "confirmation_required"
+    ) {
+      return `Invalid retained path "${pathId}": step "${stepRelId}" has invalid qualificationStatus "${step.qualificationStatus}".`;
+    }
+
+    if (!validRecencies.has(step.qualificationRecency)) {
+      return `Invalid retained path "${pathId}": step "${stepRelId}" has invalid qualificationRecency "${step.qualificationRecency}".`;
+    }
+
+    if (!Array.isArray(step.qualificationReasonCodes)) {
+      return `Invalid retained path "${pathId}": step "${stepRelId}" qualificationReasonCodes must be an array.`;
+    }
+
+    const summary = step.qualificationEvidenceSummary;
+    if (!summary || typeof summary !== "object") {
+      return `Invalid retained path "${pathId}": step "${stepRelId}" has missing qualificationEvidenceSummary.`;
+    }
+
+    for (const field of requiredSummaryFields) {
+      const val = summary[field as keyof typeof summary];
+      if (
+        typeof val !== "number" ||
+        !Number.isFinite(val) ||
+        !Number.isInteger(val) ||
+        val < 0
+      ) {
+        return `Invalid retained path "${pathId}": step "${stepRelId}" has invalid qualificationEvidenceSummary field "${field}". Must be a finite non-negative integer.`;
+      }
+    }
+  }
+
+  return null;
 }
 
 function validateScoringPolicy(policy: PathScoringPolicy): string | null {

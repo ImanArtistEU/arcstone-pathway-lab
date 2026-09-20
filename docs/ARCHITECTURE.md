@@ -48,6 +48,12 @@ $$\mathbf{REJECTED\ PATHS} \neq \mathbf{SCOREABLE\ PATHS}$$
 
 $$\mathbf{WEAKEST\ LINK\ MATTERS}$$
 
+$$\mathbf{EXPLANATION\ MUST\ MATCH\ EVIDENCE}$$
+
+$$\mathbf{MALFORMED\ PATH} \neq \mathbf{SCOREABLE\ PATH}$$
+
+$$\mathbf{SCORING\ OUTPUT\ MUST\ NOT\ MUTATE\ UPSTREAM\ STATE}$$
+
 1. **Network Visibility $\neq$ Introduction Credibility**: A weak tie or social graph connection may establish proximity, but Arcstone requires verifiable interaction or corroborated evidence before considering a relationship credible for a fundraising introduction.
 2. **Observation Time $\neq$ Interaction Time**: The time Arcstone observes or ingests an evidence artifact (`observedAt`) is strictly decoupled from the time the human interaction occurred (`interaction.occurredAt`).
 3. **Outreach $\neq$ Reciprocal Relationship**: One-way outbound outreach (e.g. unreplied email) does not constitute a reciprocal relationship and cannot qualify as introduction-eligible.
@@ -65,10 +71,13 @@ $$\mathbf{WEAKEST\ LINK\ MATTERS}$$
 15. **Scoring $\neq$ Target Person Selection**: Scoring evaluates route quality, not which decision-maker to target inside an investor organization.
 16. **Rejected Paths $\neq$ Scoreable Paths**: Paths rejected by Path Rejection receive no score.
 17. **Weakest Link Matters**: Path-level credibility and freshness are governed by the minimum component score across all steps in the path.
+18. **Explanation Must Match Evidence**: Path-level text explanations are derived strictly from computed step-level evidence snapshots without hardcoded assumptions or unverified evidence claims.
+19. **Malformed Path $\neq$ Scoreable Path**: Retained path shapes are validated before scoring; malformed, zero-step, or invalid paths fail closed with explicit execution error states.
+20. **Scoring Output Must Not Mutate Upstream State**: Output scored path candidates are deep-cloned across all nested structures to guarantee upstream immutability.
 
 ## Current status
 
-Batch 5 — Deterministic Path Scoring / Priority Index operational.
+Batch 5 — Deterministic Path Scoring / Priority Index operational (Hardened in Batch 5.1).
 
 ## Graph Semantics & Path Traversal
 

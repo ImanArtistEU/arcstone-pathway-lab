@@ -44,6 +44,24 @@ $$\mathbf{Path\ Freshness} = \min_{i} (\mathbf{Step\ Freshness}_i)$$
 
 An introduction pathway is a chain. A weak or stale intermediary cannot be "averaged away" by another strong intermediary. The weakest link governs path-level credibility and freshness.
 
+### 6. Invariant: Explanation Must Match Actual Evidence
+
+$$\mathbf{Explanation} \subseteq \mathbf{Computed\ Step\ Evidence}$$
+
+Path explanations are generated strictly from computed step-level evidence snapshots (`stepScores`). An explanation never hardcodes assumptions (such as "Both hops" or assuming all steps are direct interactions) and never claims evidence not present in the step snapshot.
+
+### 7. Invariant: Malformed Path $\neq$ Scoreable Path
+
+$$\mathbf{Malformed\ Path} \Rightarrow \mathbf{Execution\ Error}$$
+
+The scoring engine validates every retained path before scoring. If any retained path is structurally invalid (e.g. status is `rejected`, zero steps, step length mismatch, invalid recency, or invalid/missing `EvidenceSummary`), scoring fails closed with `executionStatus: "error"`. `EvidenceSummary` is strictly validated and never fabricated inside scoring.
+
+### 8. Invariant: Scoring Output is Immutable from Upstream State
+
+$$\mathbf{ScoredPath.path} \cap \mathbf{UpstreamPath} = \emptyset \quad (\text{Deep Cloned})$$
+
+Scored paths deep-clone all nested arrays (`nodes`, `relationshipIds`, `requiresConfirmationRelationshipIds`, `steps`, `qualificationReasonCodes`, `qualificationEvidenceSummary`) so post-scoring mutations to output objects cannot corrupt upstream state.
+
 ---
 
 ## Scoring Dimensions & Default Policy
