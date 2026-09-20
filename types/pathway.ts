@@ -8,15 +8,18 @@
  * - path rejection
  * - path scoring
  * - target-person selection
+ * - path explanation & activation
  *
  * Core Principle:
  * DATA -> EVIDENCE -> DECISION -> ACTION -> OUTCOME -> LEARNING
  *
  * This layer represents raw facts, observed evidence, deterministic
  * relationship qualification, path generation, path rejection, path scoring,
- * and target-person selection.
- * It does NOT choose a recommended route, generate outreach messages,
- * predict response probabilities, or train a learned model.
+ * target-person selection, and path explanation & activation planning.
+ * It selects preferred routes among retained scored paths, explains decisions,
+ * and provides deterministic activation steps.
+ * It does NOT generate outreach copy, predict response probabilities,
+ * or train a learned model.
  */
 
 export interface EntityReference {
@@ -503,3 +506,188 @@ export interface TargetPersonSelectionResult {
   isProbability: false;
   errors: string[];
 }
+
+// ============================================================================
+// PATH EXPLANATION & ACTIVATION PLAN (Batch 8)
+// ============================================================================
+
+export type PathwayExplanationExecutionStatus =
+  | "success"
+  | "upstream_error"
+  | "error";
+
+export type PathwayExplanationDisposition =
+  | "preferred_route_selected"
+  | "ambiguous_top_routes"
+  | "no_retained_route_to_primary_target"
+  | "no_primary_target"
+  | "upstream_paths_filtered"
+  | "upstream_error"
+  | "error";
+
+export interface TargetPersonComparison {
+  personId: string;
+  personName: string;
+  overallTargetPriorityIndex: number;
+  mandateFitIndex: number;
+  accessQualityIndex: number;
+  investmentRole: TargetPersonInvestmentRole;
+  investmentRoleScore: number;
+  scoreDifferenceFromPrimary: number;
+  explanation: string;
+}
+
+export interface TargetPersonDecisionExplanation {
+  personId?: string;
+  personName?: string;
+  organizationId: string;
+  organizationName: string;
+  roleTitle?: string;
+  investmentRole?: TargetPersonInvestmentRole;
+  overallTargetPriorityIndex?: number;
+  mandateFitIndex?: number;
+  accessQualityIndex?: number;
+  stageFitStatus?: TargetPersonFitStatus;
+  stageFitScore?: number;
+  sectorFitStatus?: TargetPersonFitStatus;
+  sectorFitScore?: number;
+  geographyFitStatus?: TargetPersonFitStatus;
+  geographyFitScore?: number;
+  reasons: string[];
+  candidateComparisons: TargetPersonComparison[];
+}
+
+export interface RouteEvidenceItem {
+  evidenceId: string;
+  evidenceType: RelationshipEvidenceType;
+  description: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  observedAt?: string;
+  interactionOccurredAt?: string;
+  interactionReciprocity?: InteractionReciprocity;
+  interactionStatus?: InteractionStatus;
+}
+
+export interface RouteStepExplanation {
+  relationshipId: string;
+  fromPersonId: string;
+  fromPersonName: string;
+  toPersonId: string;
+  toPersonName: string;
+  relationshipType: RelationshipType;
+  qualificationStatus: QualificationStatus;
+  qualificationRecency: RecencyBucket;
+  qualificationReasonCodes: QualificationReasonCode[];
+  relationshipCredibility: number;
+  temporalFreshness: number;
+  latestRelevantInteractionAt?: string;
+  evidenceSummary: EvidenceSummary;
+  evidenceItems: RouteEvidenceItem[];
+  whyThisConnectionExists: string;
+  confidenceLimitation?: string;
+}
+
+export interface RouteWeakestLink {
+  relationshipId: string;
+  fromPersonName: string;
+  toPersonName: string;
+  relationshipCredibility: number;
+  temporalFreshness: number;
+  qualificationStatus: QualificationStatus;
+  qualificationRecency: RecencyBucket;
+  reason: string;
+  recommendedVerification?: string;
+}
+
+export interface AlternativeRouteComparison {
+  pathId: string;
+  humanRoute: string;
+  overallPriorityIndex: number;
+  scoreDifferenceFromPreferred: number;
+  relationshipCredibility: number;
+  temporalFreshness: number;
+  confirmationReadiness: number;
+  pathEfficiency: number;
+  reasonPreferredRouteRanksHigher: string[];
+}
+
+export interface RejectedRouteExplanation {
+  pathId: string;
+  humanRoute: string;
+  rejectionReasonCodes: PathRejectionReasonCode[];
+  blockingRelationshipIds: string[];
+  explanation: string;
+}
+
+export type PathActivationType =
+  | "direct_relationship_activation"
+  | "request_intro_from_intermediary"
+  | "verify_then_request_intro"
+  | "multi_hop_activation"
+  | "relationship_discovery_required"
+  | "ambiguous_route"
+  | "no_primary_target"
+  | "unavailable";
+
+export interface ActivationStep {
+  order: number;
+  actorPersonId?: string;
+  actorPersonName?: string;
+  actionType: string;
+  action: string;
+  reason: string;
+  relationshipId?: string;
+}
+
+export interface PathActivationPlan {
+  type: PathActivationType;
+  status: string;
+  firstActorPersonId?: string;
+  firstActorPersonName?: string;
+  nextPersonId?: string;
+  nextPersonName?: string;
+  targetPersonId?: string;
+  targetPersonName?: string;
+  steps: ActivationStep[];
+  rationale: string;
+  cautions: string[];
+}
+
+export interface PreferredRouteExplanation {
+  pathId: string;
+  sourceFounderPersonId: string;
+  targetPersonId: string;
+  personIds: string[];
+  personNames: string[];
+  humanRoute: string;
+  overallPriorityIndex: number;
+  relationshipCredibility: number;
+  temporalFreshness: number;
+  confirmationReadiness: number;
+  pathEfficiency: number;
+  relationshipHopCount: number;
+  intermediaryCount: number;
+  confirmationRequiredHopCount: number;
+  bottleneckRelationshipId?: string;
+  whyPreferred: string[];
+  comparisonSummary: string;
+  steps: RouteStepExplanation[];
+  weakestLink?: RouteWeakestLink;
+  activationPlan: PathActivationPlan;
+}
+
+export interface PathwayExplanation {
+  executionStatus: PathwayExplanationExecutionStatus;
+  targetInvestorId: string;
+  disposition: PathwayExplanationDisposition;
+  targetPersonDecision: TargetPersonDecisionExplanation;
+  preferredRoute?: PreferredRouteExplanation;
+  recommendedPathId?: string;
+  topRoutePathIds: string[];
+  alternativeRoutes: AlternativeRouteComparison[];
+  rejectedRoutesToPrimaryTarget: RejectedRouteExplanation[];
+  activationPlan: PathActivationPlan;
+  errors: string[];
+}
+

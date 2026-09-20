@@ -76,12 +76,12 @@ describe("Pilot CLI & Report Generator (scripts/runPilot.ts)", () => {
     expect(mdContent.startsWith("# Arcstone Pathway Intelligence Pilot Report")).toBe(true);
   });
 
-  it("51. verifies report does NOT contain 'Top Scored Paths' and contains 'Scored Paths'", () => {
+  it("51. verifies report does NOT contain 'Top Scored Paths' and contains 'Preferred Evidence-Backed Route'", () => {
     const res = runPilotAnalysis(sampleDir, "2026-09-18");
     const mdContent = fs.readFileSync(res.mdPath!, "utf8");
 
     expect(mdContent).not.toContain("Top Scored Paths");
-    expect(mdContent).toContain("#### Scored Paths");
+    expect(mdContent).toContain("### Preferred Evidence-Backed Route");
   });
 
   it("52. verifies report contains NO system clock or random timestamps", () => {
@@ -160,6 +160,28 @@ describe("Pilot CLI & Report Generator (scripts/runPilot.ts)", () => {
             topCandidatePersonIds: [],
             evaluations: [],
             errors: [],
+          },
+          explanation: {
+            executionStatus: "upstream_error",
+            targetInvestorId: "target-error",
+            disposition: "upstream_error",
+            targetPersonDecision: {
+              organizationId: "org-error",
+              organizationName: "Error VC",
+              reasons: ["Upstream stage execution error."],
+              candidateComparisons: [],
+            },
+            topRoutePathIds: [],
+            alternativeRoutes: [],
+            rejectedRoutesToPrimaryTarget: [],
+            activationPlan: {
+              type: "unavailable",
+              status: "upstream_error",
+              steps: [],
+              rationale: "Upstream pipeline execution failed.",
+              cautions: [],
+            },
+            errors: ["Upstream stage failed execution."],
           },
           diagnosticFlags: ["ANALYSIS_ERROR"],
         },

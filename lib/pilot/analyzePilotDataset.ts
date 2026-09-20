@@ -2,11 +2,13 @@ import {
   PathwayDataset,
   TargetPersonProfile,
   TargetPersonEvaluation,
+  PathwayExplanation,
 } from "@/types/pathway";
 import { generatePathsForTarget } from "@/lib/pathway/generatePathsForTarget";
 import { applyPathRejection } from "@/lib/pathway/applyPathRejection";
 import { scoreRetainedPaths } from "@/lib/pathway/scoreRetainedPaths";
 import { selectTargetPerson } from "@/lib/pathway/selectTargetPerson";
+import { buildPathwayExplanation } from "@/lib/pathway/buildPathwayExplanation";
 
 export type PilotAnalysisStatus = "success" | "error";
 
@@ -64,6 +66,7 @@ export interface PilotTargetReport {
     evaluations: TargetPersonEvaluation[];
     errors: unknown[];
   };
+  explanation: PathwayExplanation;
   diagnosticFlags: string[];
 }
 
@@ -385,6 +388,16 @@ export function analyzePilotDataset(
       .filter((ev) => ev.decision === "reject")
       .map((ev) => `${ev.pathId}: ${ev.explanation || "REJECTED"}`);
 
+    // Build pathway explanation & activation plan
+    const explanation = buildPathwayExplanation(
+      dataset,
+      targetInvestor.id,
+      rejResult,
+      scoreResult,
+      selectResult,
+      referenceDate
+    );
+
     targetReports.push({
       targetInvestorId: targetInvestor.id,
       investorOrganizationId: targetInvestor.investorOrganizationId,
@@ -421,6 +434,7 @@ export function analyzePilotDataset(
         evaluations: selectResult.evaluations || [],
         errors: selectResult.errors || [],
       },
+      explanation,
       diagnosticFlags: flags,
     });
   }

@@ -125,34 +125,144 @@ export function generateMarkdownReport(report: PilotAnalysisReport): string {
     }
 
     // Scored Paths (Requirement 24: Scored Paths NOT "Top Scored Paths")
-    if (t.scoring.scoredPaths && t.scoring.scoredPaths.length > 0) {
-      lines.push("#### Scored Paths");
-      for (const sp of t.scoring.scoredPaths) {
-        lines.push(`- **Path \`${sp.pathId}\`** (Target Person: \`${sp.targetPersonId}\`): Priority Index = **${sp.overallPriorityIndex}**`);
-        lines.push(`  - Component Scores: Credibility = ${sp.componentScores.relationshipCredibility}, Freshness = ${sp.componentScores.temporalFreshness}, Confirmation = ${sp.componentScores.confirmationReadiness}, Efficiency = ${sp.componentScores.pathEfficiency}`);
-        lines.push(`  - Explanation: *${sp.explanation}*`);
-      }
-      lines.push("");
-    }
+    lines.push(`## Target Fund: ${t.investorOrganizationName} (\`${t.targetInvestorId}\`)`);
+    lines.push("");
 
-    if (t.rejection.rejectionReasons && t.rejection.rejectionReasons.length > 0) {
-      lines.push("#### Rejection Reasons");
-      for (const reason of t.rejection.rejectionReasons) {
+    const exp = t.explanation;
+
+    // 1. Target Person
+    lines.push("### Target Person");
+    if (exp.targetPersonDecision.personName) {
+      lines.push(`- **Selected Target:** ${exp.targetPersonDecision.personName} (\`${exp.targetPersonDecision.personId}\`)`);
+      lines.push(`- **Role Title:** ${exp.targetPersonDecision.roleTitle || "Unknown"}`);
+      lines.push(`- **Investment Role:** \`${exp.targetPersonDecision.investmentRole || "unknown"}\``);
+      lines.push(`- **Overall Target Priority Index:** **${exp.targetPersonDecision.overallTargetPriorityIndex ?? 0}/100**`);
+      lines.push(`  - Mandate Fit Index: ${exp.targetPersonDecision.mandateFitIndex ?? 0}/100`);
+      lines.push(`  - Access Quality Index: ${exp.targetPersonDecision.accessQualityIndex ?? 0}/100`);
+    } else {
+      lines.push("- **Selected Target:** None");
+    }
+    lines.push("");
+
+    // 2. Why This Person
+    lines.push("### Why This Person");
+    for (const r of exp.targetPersonDecision.reasons) {
+      lines.push(`- ${r}`);
+    }
+    if (exp.targetPersonDecision.candidateComparisons.length > 0) {
+      lines.push("");
+      lines.push("**Candidate Comparisons:**");
+      for (const comp of exp.targetPersonDecision.candidateComparisons) {
+        lines.push(`- *vs. ${comp.personName}*: ${comp.explanation}`);
+      }
+    }
+    lines.push("");
+
+    // 3. Preferred Evidence-Backed Route
+    lines.push("### Preferred Evidence-Backed Route");
+    if (exp.preferredRoute) {
+      lines.push(`- **Route:** **${exp.preferredRoute.humanRoute}**`);
+      lines.push(`- **Path Score Index:** **${exp.preferredRoute.overallPriorityIndex}/100**`);
+      lines.push(`  - Credibility: ${exp.preferredRoute.relationshipCredibility}, Freshness: ${exp.preferredRoute.temporalFreshness}, Confirmation: ${exp.preferredRoute.confirmationReadiness}, Efficiency: ${exp.preferredRoute.pathEfficiency}`);
+    } else if (exp.disposition === "no_retained_route_to_primary_target") {
+      lines.push("- **RIGHT PERSON, NO VERIFIED ROUTE**: No retained evidence-backed introduction route currently exists in the dataset.");
+    } else {
+      lines.push("- **Status:** No preferred route selected.");
+    }
+    lines.push("");
+
+    // 4. Why This Route
+    lines.push("### Why This Route");
+    if (exp.preferredRoute && exp.preferredRoute.whyPreferred.length > 0) {
+      for (const reason of exp.preferredRoute.whyPreferred) {
         lines.push(`- ${reason}`);
       }
-      lines.push("");
+    } else {
+      lines.push("- No route comparisons available.");
     }
+    lines.push("");
 
-    if (t.selection.evaluations && t.selection.evaluations.length > 0) {
-      lines.push("#### Candidate Person Evaluations");
-      for (const ev of t.selection.evaluations) {
-        lines.push(`- **Candidate \`${ev.personId}\`** (Role: \`${ev.investmentRole}\`, Title: "${ev.roleTitle}")`);
-        lines.push(`  - Target Priority Index: **${ev.overallTargetPriorityIndex}** (Mandate Fit: ${ev.mandateFitIndex}, Access Quality: ${ev.accessQualityIndex})`);
-        lines.push(`  - Fit Statuses: Stage = \`${ev.stageFitStatus}\`, Sector = \`${ev.sectorFitStatus}\`, Geography = \`${ev.geographyFitStatus}\``);
-        lines.push(`  - Explanation: *${ev.explanation}*`);
+    // 5. Connection Evidence
+    lines.push("### Connection Evidence");
+    if (exp.preferredRoute && exp.preferredRoute.steps.length > 0) {
+      for (const step of exp.preferredRoute.steps) {
+        lines.push(`- **Hop ${step.fromPersonName} → ${step.toPersonName}** (\`${step.relationshipType}\`)`);
+        lines.push(`  - Status: \`${step.qualificationStatus}\` | Recency: \`${step.qualificationRecency}\``);
+        lines.push(`  - Connection Rationale: ${step.whyThisConnectionExists}`);
+        if (step.confidenceLimitation) {
+          lines.push(`  - Limitation: *${step.confidenceLimitation}*`);
+        }
+        if (step.evidenceItems.length > 0) {
+          lines.push("  - Evidence Items:");
+          for (const ev of step.evidenceItems) {
+            lines.push(`    - [\`${ev.evidenceType}\`] ${ev.description}`);
+          }
+        }
       }
-      lines.push("");
+    } else {
+      lines.push("- No route connection evidence available.");
     }
+    lines.push("");
+
+    // 6. Weakest Link
+    lines.push("### Weakest Link");
+    if (exp.preferredRoute && exp.preferredRoute.weakestLink) {
+      const wl = exp.preferredRoute.weakestLink;
+      lines.push(`- **Weakest Step:** ${wl.fromPersonName} → ${wl.toPersonName}`);
+      lines.push(`- **Reason:** ${wl.reason}`);
+      if (wl.recommendedVerification) {
+        lines.push(`- **Recommended Action:** ${wl.recommendedVerification}`);
+      }
+    } else {
+      lines.push("- No route weakest link identified.");
+    }
+    lines.push("");
+
+    // 7. How to Activate
+    lines.push("### How to Activate");
+    lines.push(`- **Activation Strategy:** \`${exp.activationPlan.type}\``);
+    lines.push(`- **Rationale:** ${exp.activationPlan.rationale}`);
+    if (exp.activationPlan.steps.length > 0) {
+      lines.push("- **Activation Steps:**");
+      for (const s of exp.activationPlan.steps) {
+        lines.push(`  ${s.order}. **${s.actionType}:** ${s.action}`);
+      }
+    }
+    if (exp.activationPlan.cautions.length > 0) {
+      lines.push("- **Cautions:**");
+      for (const c of exp.activationPlan.cautions) {
+        lines.push(`  - ⚠️ ${c}`);
+      }
+    }
+    lines.push("");
+
+    // 8. Alternatives Considered
+    lines.push("### Alternatives Considered");
+    if (exp.alternativeRoutes.length > 0) {
+      lines.push("#### Alternative Retained Routes");
+      for (const alt of exp.alternativeRoutes) {
+        lines.push(`- **${alt.humanRoute}** (Score: ${alt.overallPriorityIndex}): ${alt.reasonPreferredRouteRanksHigher.join(" ")}`);
+      }
+    }
+    if (exp.rejectedRoutesToPrimaryTarget.length > 0) {
+      lines.push("#### Rejected Routes to Primary Target");
+      for (const rej of exp.rejectedRoutesToPrimaryTarget) {
+        lines.push(`- **${rej.humanRoute}**: Rejected because *${rej.explanation}*`);
+      }
+    }
+    if (exp.alternativeRoutes.length === 0 && exp.rejectedRoutesToPrimaryTarget.length === 0) {
+      lines.push("- No alternative routes were identified.");
+    }
+    lines.push("");
+
+    // 9. Diagnostic Flags
+    lines.push("### Diagnostic Flags");
+    if (t.diagnosticFlags.length > 0) {
+      lines.push(`- **Flags:** ${t.diagnosticFlags.map((f) => `\`${f}\``).join(", ")}`);
+    } else {
+      lines.push("- None");
+    }
+    lines.push("");
 
     lines.push("---");
     lines.push("");

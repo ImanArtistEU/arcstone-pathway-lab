@@ -3,21 +3,7 @@
 import { useState, useEffect } from "react";
 import { PilotAnalysisReport } from "@/lib/pilot/analyzePilotDataset";
 
-interface EnrichedScoredPath {
-  pathId: string;
-  targetPersonId: string;
-  overallPriorityIndex: number;
-  componentScores: {
-    relationshipCredibility: number;
-    temporalFreshness: number;
-    confirmationReadiness: number;
-    pathEfficiency: number;
-  };
-  explanation: string;
-  humanRoute?: string;
-  startPersonName?: string;
-  targetPersonName?: string;
-}
+
 
 export default function HomePage() {
   const [inputDir, setInputDir] = useState("data/fixtures/pilot-csv-sample");
@@ -199,20 +185,15 @@ export default function HomePage() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-1 gap-8">
                 {report.targetReports.map((target) => {
-                  const primaryPersonName =
-                    target.selection.primaryTargetPersonName || "Partner Contact";
-                  const primaryEval = target.selection.evaluations.find(
-                    (e) => e.personId === target.selection.primaryTargetPersonId
-                  );
+                  const exp = target.explanation;
+                  const targetPerson = exp.targetPersonDecision;
+                  const prefRoute = exp.preferredRoute;
+                  const activation = exp.activationPlan;
 
-                  const matchScore = primaryEval
-                    ? primaryEval.overallTargetPriorityIndex
-                    : 70;
-
-                  const hasWarmPath = target.scoring.scoredPathCount > 0;
-                  const scoredPath = (target.scoring.scoredPaths as EnrichedScoredPath[])[0];
+                  const matchScore = targetPerson.overallTargetPriorityIndex ?? 70;
+                  const hasWarmRoute = !!prefRoute;
 
                   return (
                     <div
@@ -241,7 +222,7 @@ export default function HomePage() {
                             )}
                           </div>
                           <p className="text-xs text-slate-400">
-                            Evaluated target firm for current fundraising round
+                            Target Investor Firm Analysis & Activation Plan
                           </p>
                         </div>
 
@@ -249,7 +230,7 @@ export default function HomePage() {
                         <div className="flex items-center gap-3 self-start md:self-auto bg-slate-950 px-4 py-2 rounded-xl border border-slate-800">
                           <div className="text-right">
                             <span className="text-[10px] font-semibold text-slate-400 uppercase block">
-                              Priority Score
+                              Priority Index
                             </span>
                             <span className="text-xs font-medium text-slate-300">
                               Mandate 70% • Access 30%
@@ -261,106 +242,278 @@ export default function HomePage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Target Partner & Mandate Box */}
-                        <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 space-y-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                              Recommended Investor Contact
-                            </span>
-                            <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                              Lead Contact
-                            </span>
-                          </div>
-
+                      {/* Section A & B: Target Person & Why This Person */}
+                      <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-900 pb-3">
                           <div>
-                            <h4 className="text-lg font-bold text-white">
-                              {primaryPersonName}
-                            </h4>
-                            <p className="text-xs text-slate-400 mt-0.5">
-                              {primaryEval?.roleTitle || "Partner"} — Lead Investor
-                            </p>
-                          </div>
-
-                          {/* Mandate Badges */}
-                          <div className="pt-2 border-t border-slate-900 space-y-2">
-                            <span className="text-[11px] font-medium text-slate-400 block">
-                              Mandate Alignment
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+                              Section A — Target Person
                             </span>
-                            <div className="flex flex-wrap gap-2">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-medium">
-                                <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                                </svg>
-                                Seed Stage Match
-                              </span>
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-medium">
-                                <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                                </svg>
-                                AI Sector Match
-                              </span>
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-medium">
-                                <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                                </svg>
-                                San Francisco Geo Match
-                              </span>
-                            </div>
+                            <h4 className="text-lg font-bold text-white mt-0.5">
+                              {targetPerson.personName || "No Primary Target Person Selected"}
+                            </h4>
+                            {targetPerson.personName && (
+                              <p className="text-xs text-slate-400">
+                                {targetPerson.roleTitle || "Partner"} — Lead Investor Role
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs font-semibold text-slate-400 block">
+                              Mandate Fit: <strong className="text-emerald-400">{targetPerson.mandateFitIndex ?? 0}/100</strong>
+                            </span>
+                            <span className="text-xs font-semibold text-slate-400 block">
+                              Access Quality: <strong className="text-indigo-400">{targetPerson.accessQualityIndex ?? 0}/100</strong>
+                            </span>
                           </div>
                         </div>
 
-                        {/* Warm Introduction Pathway Box */}
-                        <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 space-y-4 flex flex-col justify-between">
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                Access Pathway
+                        {/* Why This Person */}
+                        <div className="space-y-2">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                            Why This Person
+                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            {targetPerson.stageFitStatus === "match" && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-medium">
+                                ✓ Seed Stage Match
                               </span>
-                              {hasWarmPath ? (
-                                <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                                  Warm Route Available
-                                </span>
-                              ) : (
-                                <span className="text-[11px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
-                                  Direct Outreach Recommended
-                                </span>
-                              )}
-                            </div>
-
-                            {hasWarmPath && scoredPath ? (
-                              <div className="space-y-2">
-                                <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-sm font-semibold text-slate-100 flex items-center gap-2 overflow-x-auto">
-                                  <span className="text-emerald-400 font-bold whitespace-nowrap">
-                                    {scoredPath.humanRoute || `${scoredPath.startPersonName} → ${scoredPath.targetPersonName}`}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between text-xs text-slate-400 px-1 pt-1">
-                                  <span>Path Credibility Score:</span>
-                                  <span className="font-bold text-emerald-400">
-                                    {scoredPath.overallPriorityIndex} / 100
-                                  </span>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="p-3 bg-slate-900/50 rounded-lg border border-slate-800 text-xs text-slate-400 space-y-1">
-                                <p className="font-semibold text-slate-300">
-                                  No warm introduction network route currently identified.
-                                </p>
-                                <p>
-                                  This partner is highly prioritized based on 100% stage, sector, and geography mandate fit.
-                                </p>
-                              </div>
+                            )}
+                            {targetPerson.sectorFitStatus === "match" && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-medium">
+                                ✓ AI Sector Match
+                              </span>
+                            )}
+                            {targetPerson.geographyFitStatus === "match" && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-medium">
+                                ✓ Geography Match
+                              </span>
                             )}
                           </div>
 
-                          {/* Founder Context Narrative */}
-                          <p className="text-xs text-slate-400 italic bg-slate-900/40 p-3 rounded-lg border border-slate-800/60 leading-relaxed">
-                            {primaryEval?.explanation ||
-                              "Target partner prioritized based on investment mandate fit and network accessibility."}
-                          </p>
+                          {targetPerson.reasons.map((r, i) => (
+                            <p key={i} className="text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                              {r}
+                            </p>
+                          ))}
+
+                          {targetPerson.candidateComparisons.length > 0 && (
+                            <div className="pt-2 space-y-1">
+                              <span className="text-[11px] font-semibold text-slate-400 block">
+                                Candidate Comparisons:
+                              </span>
+                              {targetPerson.candidateComparisons.map((c, i) => (
+                                <p key={i} className="text-xs text-slate-400 italic bg-slate-900/30 px-3 py-2 rounded border border-slate-800/50">
+                                  {c.explanation}
+                                </p>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
+
+                      {/* Section C & D: Preferred Route & Why This Route */}
+                      <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-900 pb-3">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+                            Section C — Preferred Evidence-Backed Route
+                          </span>
+                          {hasWarmRoute ? (
+                            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                              Preferred Route Available (Score: {prefRoute.overallPriorityIndex}/100)
+                            </span>
+                          ) : (
+                            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
+                              RIGHT PERSON, NO VERIFIED ROUTE
+                            </span>
+                          )}
+                        </div>
+
+                        {hasWarmRoute ? (
+                          <div className="space-y-3">
+                            <div className="p-3.5 bg-slate-900 rounded-lg border border-slate-800 text-sm font-bold text-emerald-400 font-mono tracking-tight">
+                              {prefRoute.humanRoute}
+                            </div>
+
+                            <div className="space-y-1">
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                                Why This Route
+                              </span>
+                              <ul className="space-y-1 text-xs text-slate-300">
+                                {prefRoute.whyPreferred.map((w, i) => (
+                                  <li key={i} className="flex items-start gap-2 bg-slate-900/40 p-2 rounded border border-slate-800/60">
+                                    <span className="text-emerald-400 font-bold">•</span>
+                                    <span>{w}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800 text-xs text-slate-300 space-y-1.5">
+                            <p className="font-bold text-amber-300">
+                              No retained evidence-backed introduction route currently available in the dataset.
+                            </p>
+                            <p className="text-slate-400">
+                              Arcstone identifies this person as the target based on mandate fit, but no warm introduction path has been verified.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section E: Connection Evidence */}
+                      {hasWarmRoute && prefRoute.steps.length > 0 && (
+                        <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 space-y-3">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+                            Section E — Connection Evidence
+                          </span>
+                          <div className="space-y-3">
+                            {prefRoute.steps.map((st, i) => (
+                              <div key={i} className="bg-slate-900/80 border border-slate-800 rounded-lg p-3.5 space-y-2">
+                                <div className="flex items-center justify-between text-xs font-bold text-white">
+                                  <span>Hop {st.fromPersonName} → {st.toPersonName}</span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                                    st.qualificationStatus === "eligible"
+                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                      : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                  }`}>
+                                    {st.qualificationStatus} ({st.qualificationRecency})
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-300">
+                                  {st.whyThisConnectionExists}
+                                </p>
+                                {st.confidenceLimitation && (
+                                  <p className="text-[11px] text-amber-400/90 italic">
+                                    Limitation: {st.confidenceLimitation}
+                                  </p>
+                                )}
+                                {st.evidenceItems.length > 0 && (
+                                  <details className="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
+                                    <summary className="cursor-pointer font-medium hover:text-slate-200">
+                                      View Supporting Evidence Items ({st.evidenceItems.length})
+                                    </summary>
+                                    <ul className="mt-2 space-y-1 font-mono text-[10px] pl-2">
+                                      {st.evidenceItems.map((ev, ei) => (
+                                        <li key={ei} className="text-slate-300">
+                                          • [{ev.evidenceType}] {ev.description}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </details>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Section F: Weakest Link */}
+                      {hasWarmRoute && prefRoute.weakestLink && (
+                        <div className="bg-slate-950/70 border border-amber-900/30 rounded-xl p-5 space-y-2">
+                          <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block">
+                            Section F — Weakest Link Analysis
+                          </span>
+                          <p className="text-xs text-slate-200">
+                            {prefRoute.weakestLink.reason}
+                          </p>
+                          {prefRoute.weakestLink.recommendedVerification && (
+                            <p className="text-xs text-amber-300 font-medium bg-amber-950/40 p-2.5 rounded border border-amber-800/40">
+                              💡 {prefRoute.weakestLink.recommendedVerification}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Section G: How to Activate */}
+                      <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 space-y-3">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+                          Section G — Activation Plan
+                        </span>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wide">
+                              Strategy: {activation.type}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300">
+                            {activation.rationale}
+                          </p>
+
+                          {activation.steps.length > 0 && (
+                            <div className="pt-2 space-y-2">
+                              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                                Recommended Action Steps:
+                              </span>
+                              {activation.steps.map((st, i) => (
+                                <div key={i} className="flex items-start gap-3 bg-slate-900 p-3 rounded-lg border border-slate-800 text-xs">
+                                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[11px] shrink-0">
+                                    {st.order}
+                                  </span>
+                                  <div>
+                                    <strong className="text-slate-200">{st.actionType}: </strong>
+                                    <span className="text-slate-300">{st.action}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {activation.cautions.length > 0 && (
+                            <div className="pt-2 space-y-1">
+                              {activation.cautions.map((c, i) => (
+                                <p key={i} className="text-xs text-amber-400/90 flex items-center gap-1.5">
+                                  <span>⚠️</span> {c}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Section H: Alternatives Considered */}
+                      {(exp.alternativeRoutes.length > 0 || exp.rejectedRoutesToPrimaryTarget.length > 0) && (
+                        <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 space-y-3">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+                            Section H — Alternatives Considered
+                          </span>
+
+                          {exp.alternativeRoutes.length > 0 && (
+                            <div className="space-y-2">
+                              <span className="text-xs font-semibold text-slate-400 block">
+                                Alternative Retained Routes:
+                              </span>
+                              {exp.alternativeRoutes.map((alt, i) => (
+                                <div key={i} className="text-xs text-slate-300 bg-slate-900 p-2.5 rounded border border-slate-800 space-y-1">
+                                  <div className="flex items-center justify-between font-mono font-bold">
+                                    <span>{alt.humanRoute}</span>
+                                    <span className="text-slate-400">Score: {alt.overallPriorityIndex}/100</span>
+                                  </div>
+                                  <p className="text-slate-400 italic">
+                                    {alt.reasonPreferredRouteRanksHigher.join(" ")}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {exp.rejectedRoutesToPrimaryTarget.length > 0 && (
+                            <div className="space-y-2">
+                              <span className="text-xs font-semibold text-slate-400 block">
+                                Rejected Routes to Primary Target:
+                              </span>
+                              {exp.rejectedRoutesToPrimaryTarget.map((rej, i) => (
+                                <div key={i} className="text-xs text-slate-400 bg-slate-900/50 p-2.5 rounded border border-slate-800/60 space-y-1">
+                                  <span className="font-mono font-bold text-slate-300 block">{rej.humanRoute}</span>
+                                  <p className="text-rose-400/90">
+                                    Rejected: {rej.explanation}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

@@ -109,9 +109,16 @@ $$\mathbf{MISSING\ STARTUP\ RECORD} \neq \mathbf{ORGANIZATION\ FALLBACK}$$
 30. **Current Affiliation Must Actually Be Current**: `works_at` affiliations are temporally evaluated against `referenceDate` (`startedAt <= referenceDate` and `endedAt > referenceDate`); stale or future affiliations do not verify.
 31. **Missing Startup Record $\neq$ Organization Fallback**: Target Person Selection requires an actual `Startup` record from `dataset.startups`; `Organization` fallback is forbidden.
 
+32. **EXPLANATION ≠ INVENTION**: Explanations must be derived strictly from computed evaluation results, evidence objects, or candidate scores.
+33. **PREFERRED ROUTE ≠ GUARANTEED ROUTE**: Path recommendations represent relative priority indices, not guaranteed introduction success.
+34. **NO WARM PATH ≠ DIRECT OUTREACH RECOMMENDED**: When a target person is selected but no warm route exists, activation type is `relationship_discovery_required`. Cold outreach / message copy is NEVER recommended.
+35. **ROUTE RECOMMENDATION SCOPE**: Route selection ONLY considers retained scored paths (`scoringResult.scoredPaths`) where `path.targetPersonId === primaryTargetPersonId`.
+36. **TIED ROUTES ≠ ARBITRARY WINNER**: If multiple top routes share the highest score for the primary target, disposition is `ambiguous_top_routes` and `recommendedPathId` is `undefined`. No arbitrary tie-breaking is permitted.
+37. **WHY THIS ROUTE MUST BE COMPARATIVE**: Why-preferred statements compare the top route against alternative retained scored routes across credibility, freshness, confirmation, and efficiency.
+
 ## Current status
 
-Batch 7.2 — Pilot Input Contract Alignment implemented.
+Batch 8 — Path Explanation & Activation Plan implemented.
 
 ## Graph Semantics & Path Traversal
 
@@ -148,7 +155,7 @@ Path Scoring [IMPLEMENTED]
       ↓
 Target Person Selection [IMPLEMENTED]
       ↓
-Explanation / Recommended Action [PLANNED]
+Path Explanation & Activation Plan [IMPLEMENTED]
       ↓
 Outcome / Founder Feedback [PLANNED]
 ```
