@@ -325,4 +325,57 @@ describe("loadPilotCsvBundle", () => {
     expect(result.status).toBe("error");
     expect(result.errors.some((e) => e.code === "MISSING_REQUIRED_FIELD")).toBe(true);
   });
+
+  it("43. loads blank startup website, sector, geography, stage as undefined", () => {
+    const startupPath = path.join(tempDir, "startup.csv");
+    fs.writeFileSync(
+      startupPath,
+      "startupId,name,website,geography,sector,stage\nstartup-nexus,Nexus AI,,,,\n",
+      "utf8"
+    );
+
+    const result = loadPilotCsvBundle(tempDir);
+    expect(result.status).toBe("success");
+    const st = result.dataset!.startups[0];
+    expect(st.website).toBeUndefined();
+    expect(st.geography).toBeUndefined();
+    expect(st.sector).toBeUndefined();
+    expect(st.stage).toBeUndefined();
+  });
+
+  it("44. maps blank campaign round to empty string", () => {
+    const campPath = path.join(tempDir, "campaign.csv");
+    let content = fs.readFileSync(campPath, "utf8");
+    content = content.replace(",Seed,", ",,");
+    fs.writeFileSync(campPath, content, "utf8");
+
+    const result = loadPilotCsvBundle(tempDir);
+    expect(result.status).toBe("success");
+    const cmp = result.dataset!.campaigns[0];
+    expect(cmp.round).toBe("");
+  });
+
+  it("45. loads blank evidence observedAt and sourceName as undefined", () => {
+    const evPath = path.join(tempDir, "evidence.csv");
+    let content = fs.readFileSync(evPath, "utf8");
+    content = content.replace("2026-09-01T00:00:00.000Z,Nexus Website,", ",,");
+    fs.writeFileSync(evPath, content, "utf8");
+
+    const result = loadPilotCsvBundle(tempDir);
+    expect(result.status).toBe("success");
+    const ev = result.dataset!.relationshipEvidence.find((e) => e.id === "ev-founder-nexus-web")!;
+    expect(ev.observedAt).toBeUndefined();
+    expect(ev.sourceName).toBeUndefined();
+  });
+
+  it("46. fails when populated evidence observedAt is invalid date", () => {
+    const evPath = path.join(tempDir, "evidence.csv");
+    let content = fs.readFileSync(evPath, "utf8");
+    content = content.replace("2026-09-01T00:00:00.000Z", "not-a-valid-date");
+    fs.writeFileSync(evPath, content, "utf8");
+
+    const result = loadPilotCsvBundle(tempDir);
+    expect(result.status).toBe("error");
+    expect(result.errors.some((e) => e.code === "INVALID_DATE")).toBe(true);
+  });
 });

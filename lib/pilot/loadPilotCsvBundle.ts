@@ -443,27 +443,23 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
   for (const raw of startupRes.records) {
     const idRes = parseRequiredString(raw.startupId, "startupId", "startup.csv", rowIdx);
     const nameRes = parseRequiredString(raw.name, "name", "startup.csv", rowIdx);
-    const websiteRes = parseRequiredString(raw.website, "website", "startup.csv", rowIdx);
-    const geographyRes = parseRequiredString(raw.geography, "geography", "startup.csv", rowIdx);
-    const sectorRes = parseRequiredString(raw.sector, "sector", "startup.csv", rowIdx);
-    const stageRes = parseRequiredString(raw.stage, "stage", "startup.csv", rowIdx);
+    const website = parseOptionalString(raw.website);
+    const geography = parseOptionalString(raw.geography);
+    const sector = parseOptionalString(raw.sector);
+    const stage = parseOptionalString(raw.stage);
 
-    if (!idRes.value || !nameRes.value || !websiteRes.value || !geographyRes.value || !sectorRes.value || !stageRes.value) {
+    if (!idRes.value || !nameRes.value) {
       if (idRes.error) errors.push(idRes.error);
       if (nameRes.error) errors.push(nameRes.error);
-      if (websiteRes.error) errors.push(websiteRes.error);
-      if (geographyRes.error) errors.push(geographyRes.error);
-      if (sectorRes.error) errors.push(sectorRes.error);
-      if (stageRes.error) errors.push(stageRes.error);
     } else {
       checkDuplicateId(idRes.value, "startup.csv", rowIdx);
       startups.push({
         id: idRes.value,
         name: nameRes.value,
-        website: websiteRes.value,
-        geography: geographyRes.value,
-        sector: sectorRes.value,
-        stage: stageRes.value,
+        website,
+        geography,
+        sector,
+        stage,
       });
     }
     rowIdx++;
@@ -484,14 +480,13 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
   for (const raw of campaignRes.records) {
     const idRes = parseRequiredString(raw.campaignId, "campaignId", "campaign.csv", rowIdx);
     const startupIdRes = parseRequiredString(raw.startupId, "startupId", "campaign.csv", rowIdx);
-    const roundRes = parseRequiredString(raw.round, "round", "campaign.csv", rowIdx);
+    const round = parseOptionalString(raw.round) ?? "";
     const statusRes = parseRequiredString(raw.status, "status", "campaign.csv", rowIdx);
     const createdAtRes = parseValidDate(raw.createdAt, "createdAt", "campaign.csv", rowIdx, true);
 
-    if (!idRes.value || !startupIdRes.value || !roundRes.value || !statusRes.value || !createdAtRes.value) {
+    if (!idRes.value || !startupIdRes.value || !statusRes.value || !createdAtRes.value) {
       if (idRes.error) errors.push(idRes.error);
       if (startupIdRes.error) errors.push(startupIdRes.error);
-      if (roundRes.error) errors.push(roundRes.error);
       if (statusRes.error) errors.push(statusRes.error);
       if (createdAtRes.error) errors.push(createdAtRes.error);
     } else {
@@ -510,7 +505,7 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
       campaigns.push({
         id: idRes.value,
         startupId: startupIdRes.value,
-        round: roundRes.value,
+        round,
         status: statusRes.value as CampaignStatus,
         createdAt: createdAtRes.value,
         founderPersonIds: [], // Will be populated via derivation
@@ -776,8 +771,8 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
     const relIdRes = parseRequiredString(raw.relationshipId, "relationshipId", "evidence.csv", rowIdx);
     const typeRes = parseRequiredString(raw.type, "type", "evidence.csv", rowIdx);
     const descRes = parseRequiredString(raw.description, "description", "evidence.csv", rowIdx);
-    const observedAtRes = parseValidDate(raw.observedAt, "observedAt", "evidence.csv", rowIdx, true);
-    const sourceNameRes = parseRequiredString(raw.sourceName, "sourceName", "evidence.csv", rowIdx);
+    const observedAtRes = parseValidDate(raw.observedAt, "observedAt", "evidence.csv", rowIdx, false);
+    const sourceName = parseOptionalString(raw.sourceName);
     const sourceUrl = parseOptionalString(raw.sourceUrl);
 
     // Interaction metadata check (Requirement 17)
@@ -836,13 +831,12 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
       }
     }
 
-    if (!idRes.value || !relIdRes.value || !typeRes.value || !descRes.value || !observedAtRes.value || !sourceNameRes.value) {
+    if (!idRes.value || !relIdRes.value || !typeRes.value || !descRes.value || observedAtRes.error) {
       if (idRes.error) errors.push(idRes.error);
       if (relIdRes.error) errors.push(relIdRes.error);
       if (typeRes.error) errors.push(typeRes.error);
       if (descRes.error) errors.push(descRes.error);
       if (observedAtRes.error) errors.push(observedAtRes.error);
-      if (sourceNameRes.error) errors.push(sourceNameRes.error);
     } else {
       if (!VALID_EVIDENCE_TYPES.includes(typeRes.value as RelationshipEvidenceType)) {
         errors.push({
@@ -862,7 +856,7 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
         type: typeRes.value as RelationshipEvidenceType,
         description: descRes.value,
         observedAt: observedAtRes.value,
-        sourceName: sourceNameRes.value,
+        sourceName,
         sourceUrl,
         interaction: interactionMetadata,
       });

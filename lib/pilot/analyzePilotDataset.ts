@@ -271,8 +271,9 @@ export function analyzePilotDataset(
     // Requirement 6: UPSTREAM_FILTERING_DIAGNOSTIC
     if (
       genResult.disposition === "confirmation_paths_filtered" ||
-      rejResult.disposition === "all_paths_rejected" ||
-      scoreResult.disposition === "upstream_paths_filtered"
+      rejResult.disposition === "upstream_paths_filtered" ||
+      scoreResult.disposition === "upstream_paths_filtered" ||
+      selectResult.disposition === "upstream_paths_filtered"
     ) {
       flags.push("PATHS_FILTERED_UPSTREAM");
     }
@@ -335,19 +336,21 @@ export function analyzePilotDataset(
       }
     }
 
-    if (!startup.stage) {
+    if (!startup.stage || startup.stage.trim() === "") {
       if (!flags.includes("MISSING_STARTUP_STAGE")) {
         flags.push("MISSING_STARTUP_STAGE");
       }
-      hasIncompleteContext = true;
+      if (!campaign.round || campaign.round.trim() === "") {
+        hasIncompleteContext = true;
+      }
     }
-    if (!startup.sector) {
+    if (!startup.sector || startup.sector.trim() === "") {
       if (!flags.includes("MISSING_STARTUP_SECTOR")) {
         flags.push("MISSING_STARTUP_SECTOR");
       }
       hasIncompleteContext = true;
     }
-    if (!startup.geography) {
+    if (!startup.geography || startup.geography.trim() === "") {
       if (!flags.includes("MISSING_STARTUP_GEOGRAPHY")) {
         flags.push("MISSING_STARTUP_GEOGRAPHY");
       }

@@ -42,6 +42,16 @@ Open the CSV files in your spreadsheet editor (e.g., Google Sheets, Excel, Numbe
 7. `evidence.csv` — Evidence artifacts supporting each relationship (emails, meetings, board decks, public records).
 8. `target-person-profiles.csv` — Candidate investor profiles (role, investment focus arrays for stage/sector/geography).
 
+### Field Requirement Matrix
+The pilot harness enforces strict entity validation while permitting reasonable optionality:
+
+| File | Required Fields | Optional Fields | Notes / Mapping Rules |
+| :--- | :--- | :--- | :--- |
+| `startup.csv` | `startupId`, `name` | `website`, `geography`, `sector`, `stage` | Blank optional cells yield `undefined`. Headers mandatory. |
+| `campaign.csv` | `campaignId`, `startupId`, `status`, `createdAt` | `round` | Blank `round` maps to `""` (empty string). Headers mandatory. |
+| `evidence.csv` | `evidenceId`, `relationshipId`, `type`, `description` | `observedAt`, `sourceName`, `sourceUrl` | Blank optional cells yield `undefined`. Populated `observedAt` must be valid date. Headers mandatory. |
+| `evidence.csv` (interaction) | N/A | `interactionOccurredAt`, `interactionReciprocity`, `interactionStatus` | Optional, but if ANY interaction field is populated, all three are required. |
+
 ### Multi-Value Formatting
 For fields supporting multiple values (e.g., `candidatePersonIds`, `evidenceIds`, `stageFocus`, `sectorFocus`, `geographyFocus`), use the pipe character (`|`) as a delimiter:
 * Example: `Seed|Series A`
@@ -62,21 +72,25 @@ The harness generates two diagnostic files under `pilot-output/<bundle-name>/`:
 
 ---
 
-## 2. Eleven Nontechnical Pilot Review Questions
+## 2. Nontechnical Strategic Pilot Review Questions
 
-After completing a pilot run, evaluate your results using these 11 strategic review questions:
+After completing a pilot run, evaluate your results using these strategic review questions to assess product validity and uncover real-world data gaps:
 
 1. **Target Person Selection:** Did Arcstone pick the right target person at this fund?
 2. **Selection Root Cause:** If not, why? (wrong sector focus, wrong stage focus, wrong role title, missing target profile)
 3. **Pathway Quality:** Did Arcstone find the best introduction pathway?
 4. **Missing Warm Paths:** Did Arcstone miss a warm path that the founder actually has?
 5. **Invalid Warm Paths:** Did Arcstone output a warm path that is actually dead, invalid, or inappropriate?
-6. **No Known Path Accuracy:** Did the system classify a path as "No Known Path" when a real path exists?
-7. **Analysis Error Decoupling:** Did the system classify an analysis error as "No Known Path"? (Analysis errors MUST emit `ANALYSIS_ERROR`, never `NO_KNOWN_PATH`).
-8. **Confirmation Visibility:** Were confirmation-required paths highlighted properly in the report?
-9. **Mandate vs Access Dominance:** Is the primary person selected truly the best contact based on mandate fit, or just the easiest person to reach?
-10. **Context Completeness:** Is any required startup or investor context missing from the CSV bundle?
-11. **Loader & Integrity Stability:** Did any dataset loading error or integrity error prevent analysis?
+6. **False Rejections:** Where are we rejecting warm paths that a human partner would actually take?
+7. **Mandate Dominance without Paths:** Where are we ranking an investor high based on mandate fit when no usable path exists?
+8. **Real-World Evidence Gaps:** Which evidence types in real data are missing timestamps or sources, and how does that affect freshness scoring?
+9. **Tie-Breaking Needs:** How often does target person selection tie, and what additional data (e.g. recent deals) would break the tie?
+10. **No Known Path Accuracy:** Did the system classify a path as "No Known Path" when a real path exists?
+11. **Analysis Error Decoupling:** Did the system classify an analysis error as "No Known Path"? (Analysis errors MUST emit `ANALYSIS_ERROR`, never `NO_KNOWN_PATH`).
+12. **Confirmation Visibility:** Were confirmation-required paths highlighted properly in the report?
+13. **Mandate vs Access Dominance:** Is the primary person selected truly the best contact based on mandate fit, or just the easiest person to reach?
+14. **Context Completeness:** Is any required startup or investor context missing from the CSV bundle?
+15. **Loader & Integrity Stability:** Did any dataset loading error or integrity error prevent analysis?
 
 ---
 

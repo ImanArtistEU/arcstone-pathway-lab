@@ -111,7 +111,7 @@ $$\mathbf{MISSING\ STARTUP\ RECORD} \neq \mathbf{ORGANIZATION\ FALLBACK}$$
 
 ## Current status
 
-Batch 7 — Private Real-Data Pilot Harness implemented.
+Batch 7.2 — Pilot Input Contract Alignment implemented.
 
 ## Graph Semantics & Path Traversal
 
