@@ -54,6 +54,18 @@ $$\mathbf{MALFORMED\ PATH} \neq \mathbf{SCOREABLE\ PATH}$$
 
 $$\mathbf{SCORING\ OUTPUT\ MUST\ NOT\ MUTATE\ UPSTREAM\ STATE}$$
 
+$$\mathbf{RIGHT\ PERSON} \neq \mathbf{EASIEST\ PERSON\ TO\ REACH}$$
+
+$$\mathbf{TARGET\ FIT} \neq \mathbf{ACCESS\ QUALITY}$$
+
+$$\mathbf{NO\ WARM\ PATH} \neq \mathbf{WRONG\ TARGET\ PERSON}$$
+
+$$\mathbf{SELECTION} \neq \mathbf{OUTREACH\ RECOMMENDATION}$$
+
+$$\mathbf{CANDIDATE\ DISCOVERY} \neq \mathbf{TARGET\ PERSON\ SELECTION}$$
+
+$$\mathbf{MISSING\ PERSON\ CONTEXT} \neq \mathbf{PERSON\ IRRELEVANCE}$$
+
 1. **Network Visibility $\neq$ Introduction Credibility**: A weak tie or social graph connection may establish proximity, but Arcstone requires verifiable interaction or corroborated evidence before considering a relationship credible for a fundraising introduction.
 2. **Observation Time $\neq$ Interaction Time**: The time Arcstone observes or ingests an evidence artifact (`observedAt`) is strictly decoupled from the time the human interaction occurred (`interaction.occurredAt`).
 3. **Outreach $\neq$ Reciprocal Relationship**: One-way outbound outreach (e.g. unreplied email) does not constitute a reciprocal relationship and cannot qualify as introduction-eligible.
@@ -74,10 +86,16 @@ $$\mathbf{SCORING\ OUTPUT\ MUST\ NOT\ MUTATE\ UPSTREAM\ STATE}$$
 18. **Explanation Must Match Evidence**: Path-level text explanations are derived strictly from computed step-level evidence snapshots without hardcoded assumptions or unverified evidence claims.
 19. **Malformed Path $\neq$ Scoreable Path**: Retained path shapes are validated before scoring; malformed, zero-step, or invalid paths fail closed with explicit execution error states.
 20. **Scoring Output Must Not Mutate Upstream State**: Output scored path candidates are deep-cloned across all nested structures to guarantee upstream immutability.
+21. **Right Person $\neq$ Easiest Person to Reach**: Functional role and mandate thesis fit dominate access quality. A junior non-investment contact is excluded regardless of path score.
+22. **Target Fit $\neq$ Access Quality**: Mandate fit and graph access quality are calculated independently before combining into an overall priority index.
+23. **No Warm Path $\neq$ Wrong Target Person**: Candidates with zero warm paths can still be selected as primary target if mandate fit is superior.
+24. **Selection $\neq$ Outreach Recommendation**: Selection answers *WHO* to prioritize, not *HOW* to reach out or message them.
+25. **Candidate Discovery $\neq$ Target Person Selection**: Candidates are supplied explicitly in `TargetInvestor.candidatePersonIds`. Selection does not discover external people.
+26. **Missing Person Context $\neq$ Person Irrelevance**: Missing target person profiles yield `insufficient_context` rather than silent candidate exclusion.
 
 ## Current status
 
-Batch 5 — Deterministic Path Scoring / Priority Index operational (Hardened in Batch 5.1).
+Batch 6 — Deterministic Target Person Selection operational.
 
 ## Graph Semantics & Path Traversal
 

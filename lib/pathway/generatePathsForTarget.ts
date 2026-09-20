@@ -15,6 +15,7 @@ import {
   DEFAULT_PATH_GENERATION_POLICY,
 } from "./pathGenerationPolicy";
 import { buildTraversalGraph, TraversalGraphEdge } from "./buildTraversalGraph";
+import { isCurrentTargetPersonAffiliationVerified } from "./targetPersonAffiliation";
 
 interface PathSearchState {
   currentPersonId: string;
@@ -280,23 +281,9 @@ export function generatePathsForTarget(
 
   // 9. Verify Target Person Affiliation
   for (const cId of targetPersonIds) {
-    const person = dataset.people.find((p) => p.id === cId)!;
     const targetOrgId = targetInvestor.investorOrganizationId;
 
-    const isOrgIdMatch =
-      Array.isArray(person.currentOrganizationIds) &&
-      person.currentOrganizationIds.includes(targetOrgId);
-
-    const isWorksAtMatch = dataset.relationships.some(
-      (r) =>
-        r.from.type === "person" &&
-        r.from.id === cId &&
-        r.to.type === "organization" &&
-        r.to.id === targetOrgId &&
-        r.type === "works_at"
-    );
-
-    if (!isOrgIdMatch && !isWorksAtMatch) {
+    if (!isCurrentTargetPersonAffiliationVerified(dataset, cId, targetOrgId)) {
       return createErrorResult(
         targetInvestorId,
         [

@@ -1,9 +1,11 @@
 import { pathwayDemoDataset } from "@/data/fixtures/pathway-demo";
+import { targetPersonDemoProfiles } from "@/data/fixtures/target-person-profiles";
 import { assertDatasetIntegrity } from "@/lib/pathway/assertDatasetIntegrity";
 import { qualifyRelationships } from "@/lib/pathway/qualifyRelationships";
 import { generatePathsForTarget } from "@/lib/pathway/generatePathsForTarget";
 import { applyPathRejection } from "@/lib/pathway/applyPathRejection";
 import { scoreRetainedPaths } from "@/lib/pathway/scoreRetainedPaths";
+import { selectTargetPerson } from "@/lib/pathway/selectTargetPerson";
 
 export default function HomePage() {
   const integrity = assertDatasetIntegrity(pathwayDemoDataset);
@@ -22,12 +24,20 @@ export default function HomePage() {
     const generationResult = generatePathsForTarget(pathwayDemoDataset, target.id, "2026-09-18");
     const rejectionResult = applyPathRejection(generationResult);
     const scoringResult = scoreRetainedPaths(rejectionResult);
+    const selectionResult = selectTargetPerson(
+      pathwayDemoDataset,
+      target.id,
+      targetPersonDemoProfiles,
+      scoringResult,
+      "2026-09-18"
+    );
     return {
       targetId: target.id,
       orgName,
       generationResult,
       rejectionResult,
       scoringResult,
+      selectionResult,
     };
   });
 
@@ -42,7 +52,7 @@ export default function HomePage() {
         </p>
 
         <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 mb-6">
-          Batch 5 — Path scoring operational
+          Batch 6 — Target person selection operational
         </div>
 
         {/* Dataset Counts */}
@@ -206,6 +216,64 @@ export default function HomePage() {
                       </div>
                       <div className="text-[11px] text-gray-500 italic pt-1 mt-1 border-t border-gray-100">
                         NOT SCORED
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Target Person Selection Results */}
+        <div className="border-t border-gray-100 pt-5 text-left mb-5 space-y-3">
+          <span className="text-xs uppercase tracking-wider text-gray-500 font-medium block mb-2">
+            Target Person Selection by Investor
+          </span>
+          {targets.map(({ targetId, orgName, selectionResult }) => {
+            const primaryId = selectionResult.primaryTargetPersonId;
+            const primaryName = primaryId ? personMap.get(primaryId) || primaryId : "None Selected";
+            const primaryEval = selectionResult.evaluations.find((e) => e.personId === primaryId);
+
+            return (
+              <div
+                key={targetId}
+                className="p-3 rounded-lg border border-gray-100 bg-gray-50/50 space-y-2 text-xs font-mono"
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-gray-900 text-sm font-sans">
+                    {orgName}
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium uppercase text-indigo-700 bg-indigo-50 border-indigo-200">
+                    {selectionResult.disposition.replace(/_/g, " ")}
+                  </span>
+                </div>
+
+                <div className="p-2.5 bg-white rounded border border-gray-100 space-y-1.5">
+                  <div className="flex justify-between items-center text-sm font-bold text-gray-900 font-sans">
+                    <span>Target Person: <span className="text-indigo-600">{primaryName}</span></span>
+                    {primaryEval && (
+                      <span className="text-emerald-700 font-mono">
+                        Priority: {primaryEval.overallTargetPriorityIndex} / 100
+                      </span>
+                    )}
+                  </div>
+
+                  {primaryEval && (
+                    <div className="space-y-1 text-gray-700 pt-1 border-t border-gray-100">
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
+                        <div>Role: {primaryEval.roleTitle} ({primaryEval.investmentRole})</div>
+                        <div>Mandate Fit: {primaryEval.mandateFitIndex} / 100</div>
+                        <div>Access Quality: {primaryEval.accessQualityIndex} / 100</div>
+                        <div>Role Score: {primaryEval.investmentRoleScore}</div>
+                        <div>Stage Fit: {primaryEval.stageFitStatus}</div>
+                        <div>Sector Fit: {primaryEval.sectorFitStatus}</div>
+                      </div>
+                      <p className="text-[10px] font-sans text-gray-500 italic mt-1 leading-snug">
+                        {primaryEval.explanation}
+                      </p>
+                      <div className="text-[10px] text-amber-700 bg-amber-50/70 p-1 rounded font-sans font-semibold mt-1">
+                        TARGET PRIORITY = UNCALIBRATED HEURISTIC
                       </div>
                     </div>
                   )}

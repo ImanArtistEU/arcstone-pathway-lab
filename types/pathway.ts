@@ -1,18 +1,22 @@
 /**
  * Arcstone Pathway Intelligence Domain Types
  *
- * Batch 1 — Domain Model and Dataset Contract
- * Batch 2 — Deterministic Relationship Qualification
- * Batch 3 — Deterministic Path Generation & Traversal Engine
- * Batch 4 — Deterministic Path Rejection & Viability Filter
- * Batch 5 — Deterministic Path Scoring & Priority Index
+ * Implemented stages:
+ * - evidence/domain model
+ * - relationship qualification
+ * - path generation
+ * - path rejection
+ * - path scoring
+ * - target-person selection
  *
  * Core Principle:
  * DATA -> EVIDENCE -> DECISION -> ACTION -> OUTCOME -> LEARNING
  *
  * This layer represents raw facts, observed evidence, deterministic
- * relationship qualification, path generation, path rejection, and path scoring.
- * It does NOT perform target-person selection, choose a recommended path, or train a probability or learned model.
+ * relationship qualification, path generation, path rejection, path scoring,
+ * and target-person selection.
+ * It does NOT choose a recommended route, generate outreach messages,
+ * predict response probabilities, or train a learned model.
  */
 
 export interface EntityReference {
@@ -427,4 +431,75 @@ export interface RelationshipQualification {
   evidenceSummary: EvidenceSummary;
   reasonCodes: QualificationReasonCode[];
   explanation: string;
+}
+
+export type TargetPersonInvestmentRole =
+  | "lead_investor"
+  | "investment_team"
+  | "sourcing"
+  | "non_investment"
+  | "unknown";
+
+export interface TargetPersonProfile {
+  targetInvestorId: string;
+  personId: string;
+  roleTitle: string;
+  investmentRole: TargetPersonInvestmentRole;
+  stageFocus: string[];
+  sectorFocus: string[];
+  geographyFocus: string[];
+  observedAt: string;
+  sourceName?: string;
+  sourceUrl?: string;
+}
+
+export type TargetPersonFitStatus = "match" | "no_match" | "unknown";
+
+export interface TargetPersonEvaluation {
+  personId: string;
+  targetInvestorId: string;
+  roleTitle: string;
+  investmentRole: TargetPersonInvestmentRole;
+  investmentRoleScore: number;
+  stageFitStatus: TargetPersonFitStatus;
+  stageFitScore: number;
+  sectorFitStatus: TargetPersonFitStatus;
+  sectorFitScore: number;
+  geographyFitStatus: TargetPersonFitStatus;
+  geographyFitScore: number;
+  mandateFitIndex: number;
+  accessQualityIndex: number;
+  scoredPathCount: number;
+  highestScoringPathId?: string;
+  overallTargetPriorityIndex: number;
+  selectable: boolean;
+  explanation: string;
+}
+
+export type TargetPersonSelectionExecutionStatus =
+  | "success"
+  | "upstream_error"
+  | "error";
+
+export type TargetPersonSelectionDisposition =
+  | "primary_target_selected"
+  | "ambiguous_top_candidates"
+  | "no_selectable_candidates"
+  | "insufficient_context"
+  | "upstream_paths_filtered"
+  | "upstream_error"
+  | "error";
+
+export interface TargetPersonSelectionResult {
+  executionStatus: TargetPersonSelectionExecutionStatus;
+  targetInvestorId: string;
+  candidatePersonIds: string[];
+  evaluations: TargetPersonEvaluation[];
+  priorityOrderPersonIds: string[];
+  primaryTargetPersonId?: string;
+  topCandidatePersonIds: string[];
+  disposition: TargetPersonSelectionDisposition;
+  calibrationStatus: "uncalibrated_heuristic";
+  isProbability: false;
+  errors: string[];
 }
