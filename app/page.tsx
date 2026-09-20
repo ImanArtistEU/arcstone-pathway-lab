@@ -1,300 +1,335 @@
-import { pathwayDemoDataset } from "@/data/fixtures/pathway-demo";
-import { targetPersonDemoProfiles } from "@/data/fixtures/target-person-profiles";
-import { assertDatasetIntegrity } from "@/lib/pathway/assertDatasetIntegrity";
-import { qualifyRelationships } from "@/lib/pathway/qualifyRelationships";
-import { generatePathsForTarget } from "@/lib/pathway/generatePathsForTarget";
-import { applyPathRejection } from "@/lib/pathway/applyPathRejection";
-import { scoreRetainedPaths } from "@/lib/pathway/scoreRetainedPaths";
-import { selectTargetPerson } from "@/lib/pathway/selectTargetPerson";
+"use client";
+
+import { useState, useEffect } from "react";
+import { PilotAnalysisReport } from "@/lib/pilot/analyzePilotDataset";
 
 export default function HomePage() {
-  const integrity = assertDatasetIntegrity(pathwayDemoDataset);
-  const qualifications = qualifyRelationships(pathwayDemoDataset, "2026-09-18");
+  const [inputDir, setInputDir] = useState("data/fixtures/pilot-csv-sample");
+  const [referenceDate, setReferenceDate] = useState("2026-09-18");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<PilotAnalysisReport | null>(null);
+  const [activeTab, setActiveTab] = useState<"visual" | "json">("visual");
 
-  const eligibleCount = qualifications.filter((q) => q.status === "eligible").length;
-  const confirmationCount = qualifications.filter((q) => q.status === "confirmation_required").length;
-  const structuralCount = qualifications.filter((q) => q.status === "structural").length;
-  const ineligibleCount = qualifications.filter((q) => q.status === "ineligible").length;
+  const runAnalysis = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/pilot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inputDir, referenceDate }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.status === "error" || data.status === "load_error") {
+        const errs = data.errors || [{ message: "Unknown error occurred" }];
+        setError(errs.map((e: { code?: string; message: string }) => `${e.code ? `[${e.code}] ` : ""}${e.message}`).join("\n"));
+        setReport(null);
+      } else {
+        setReport(data.analysis.report);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+      setReport(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const personMap = new Map(pathwayDemoDataset.people.map((p) => [p.id, p.fullName]));
-  const orgMap = new Map(pathwayDemoDataset.organizations.map((o) => [o.id, o.name]));
-
-  const targets = pathwayDemoDataset.targetInvestors.map((target) => {
-    const orgName = orgMap.get(target.investorOrganizationId) || target.investorOrganizationId;
-    const generationResult = generatePathsForTarget(pathwayDemoDataset, target.id, "2026-09-18");
-    const rejectionResult = applyPathRejection(generationResult);
-    const scoringResult = scoreRetainedPaths(rejectionResult);
-    const selectionResult = selectTargetPerson(
-      pathwayDemoDataset,
-      target.id,
-      targetPersonDemoProfiles,
-      scoringResult,
-      "2026-09-18"
-    );
-    return {
-      targetId: target.id,
-      orgName,
-      generationResult,
-      rejectionResult,
-      scoringResult,
-      selectionResult,
-    };
-  });
+  useEffect(() => {
+    runAnalysis();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-gray-50">
-      <div className="max-w-xl w-full bg-white rounded-lg border border-gray-200 p-8 shadow-sm text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-2">
-          Arcstone Pathway Lab
-        </h1>
-        <p className="text-base text-gray-600 mb-5">
-          Standalone prototype environment for Pathway Intelligence.
-        </p>
-
-        <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 mb-6">
-          Batch 6 — Target person selection operational
-        </div>
-
-        {/* Dataset Counts */}
-        <div className="grid grid-cols-2 gap-4 text-left border-t border-gray-100 pt-5 mb-5">
+    <main className="min-h-screen bg-slate-900 text-slate-100 p-6 md:p-12 font-sans">
+      <div className="max-w-6xl mx-auto space-y-8">
+        {/* Header */}
+        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800 pb-6">
           <div>
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">People</span>
-            <p className="text-xl font-semibold text-gray-900">
-              {pathwayDemoDataset.people.length}
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-extrabold text-white tracking-tight">
+                Arcstone Pathway Lab
+              </h1>
+              <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Pilot Harness Active
+              </span>
+            </div>
+            <p className="text-slate-400 text-sm mt-1">
+              Deterministic Decision Pipeline Visualizer & Diagnostic Test Harness
             </p>
           </div>
-          <div>
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Organizations</span>
-            <p className="text-xl font-semibold text-gray-900">
-              {pathwayDemoDataset.organizations.length}
-            </p>
-          </div>
-          <div>
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Relationships</span>
-            <p className="text-xl font-semibold text-gray-900">
-              {pathwayDemoDataset.relationships.length}
-            </p>
-          </div>
-          <div>
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Evidence</span>
-            <p className="text-xl font-semibold text-gray-900">
-              {pathwayDemoDataset.relationshipEvidence.length}
-            </p>
-          </div>
-          <div className="col-span-2">
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Target Investors</span>
-            <p className="text-xl font-semibold text-gray-900">
-              {pathwayDemoDataset.targetInvestors.length}
-            </p>
-          </div>
-        </div>
+        </header>
 
-        {/* Qualification Counts */}
-        <div className="border-t border-gray-100 pt-5 text-left mb-5">
-          <span className="text-xs uppercase tracking-wider text-gray-500 font-medium block mb-3">
-            Qualification Status (2026-09-18)
-          </span>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-2.5 rounded bg-emerald-50 border border-emerald-100">
-              <span className="text-xs text-emerald-800 font-medium">Eligible</span>
-              <p className="text-lg font-bold text-emerald-900">{eligibleCount}</p>
+        {/* Controls Card */}
+        <section className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 backdrop-blur shadow-lg">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+              <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-2">
+                Pilot CSV Directory
+              </label>
+              <input
+                type="text"
+                value={inputDir}
+                onChange={(e) => setInputDir(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                placeholder="data/fixtures/pilot-csv-sample"
+              />
             </div>
-            <div className="p-2.5 rounded bg-amber-50 border border-amber-100">
-              <span className="text-xs text-amber-800 font-medium">Confirmation Required</span>
-              <p className="text-lg font-bold text-amber-900">{confirmationCount}</p>
+            <div>
+              <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-2">
+                Reference Date
+              </label>
+              <input
+                type="date"
+                value={referenceDate}
+                onChange={(e) => setReferenceDate(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              />
             </div>
-            <div className="p-2.5 rounded bg-slate-50 border border-slate-200">
-              <span className="text-xs text-slate-700 font-medium">Structural</span>
-              <p className="text-lg font-bold text-slate-900">{structuralCount}</p>
-            </div>
-            <div className="p-2.5 rounded bg-rose-50 border border-rose-100">
-              <span className="text-xs text-rose-800 font-medium">Ineligible</span>
-              <p className="text-lg font-bold text-rose-900">{ineligibleCount}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Path Scoring Results */}
-        <div className="border-t border-gray-100 pt-5 text-left mb-5 space-y-3">
-          <span className="text-xs uppercase tracking-wider text-gray-500 font-medium block mb-2">
-            Path Scoring by Target
-          </span>
-          {targets.map(({ targetId, orgName, generationResult, rejectionResult, scoringResult }) => {
-            const allEvaluated = [
-              ...rejectionResult.retainedPaths,
-              ...rejectionResult.rejectedPaths,
-            ];
-
-            return (
-              <div
-                key={targetId}
-                className="p-3 rounded-lg border border-gray-100 bg-gray-50/50 space-y-2"
+            <div>
+              <button
+                onClick={runAnalysis}
+                disabled={loading}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold py-2 px-4 rounded-lg text-sm transition-all duration-150 flex items-center justify-center gap-2 shadow-md"
               >
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-900 text-sm">
-                    {orgName}
-                  </span>
-                  <span className="text-xs font-mono text-gray-500">
-                    GENERATED: {rejectionResult.inputPathCount} | RETAINED: {rejectionResult.retainedPaths.length} | REJECTED: {rejectionResult.rejectedPathCount}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {allEvaluated.length > 0 ? (
-                    allEvaluated.map((p) => {
-                      const evalRecord = rejectionResult.evaluations.find(
-                        (e) => e.pathId === p.id
-                      );
-                      const isRetained = evalRecord?.decision === "retain";
-                      const isEligible = p.status === "eligible";
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Analyzing...
+                  </>
+                ) : (
+                  "Run Pipeline Analysis"
+                )}
+              </button>
+            </div>
+          </div>
 
-                      const scoredPathObj = scoringResult.scoredPaths.find(
-                        (sp) => sp.path.id === p.id
-                      );
+          {/* Quick presets */}
+          <div className="mt-3 flex items-center gap-2 text-xs text-slate-400">
+            <span>Quick Presets:</span>
+            <button
+              onClick={() => {
+                setInputDir("data/fixtures/pilot-csv-sample");
+                setReferenceDate("2026-09-18");
+              }}
+              className="px-2 py-1 rounded bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+            >
+              Synthetic Sample
+            </button>
+            <button
+              onClick={() => {
+                setInputDir("data/templates/real-pilot");
+                setReferenceDate("2026-09-18");
+              }}
+              className="px-2 py-1 rounded bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+            >
+              Template Bundle
+            </button>
+          </div>
+        </section>
 
-                      const statusBadgeText = isRetained
-                        ? isEligible
-                          ? "RETAINED"
-                          : "RETAINED — CONFIRMATION REQUIRED"
-                        : "REJECTED";
+        {/* Errors */}
+        {error && (
+          <div className="bg-rose-950/60 border border-rose-800 text-rose-200 rounded-xl p-4 text-sm font-mono whitespace-pre-wrap">
+            <span className="font-bold block mb-1">Analysis Failed / Errors:</span>
+            {error}
+          </div>
+        )}
 
-                      const statusBadgeClass = isRetained
-                        ? isEligible
-                          ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                          : "text-amber-700 bg-amber-50 border-amber-200"
-                        : "text-rose-700 bg-rose-50 border-rose-200";
+        {/* Results */}
+        {report && (
+          <div className="space-y-6">
+            {/* Meta & Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">Startup</span>
+                <p className="text-xl font-bold text-white mt-1 truncate">{report.meta.startupName}</p>
+                <span className="text-xs text-slate-500 font-mono block mt-0.5">{report.meta.startupId}</span>
+              </div>
+              <div className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">Targets Analyzed</span>
+                <p className="text-2xl font-extrabold text-emerald-400 mt-1">{report.summary.targetsAnalyzed}</p>
+              </div>
+              <div className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">Retained Paths</span>
+                <p className="text-2xl font-extrabold text-indigo-400 mt-1">{report.summary.targetsWithRetainedPaths}</p>
+              </div>
+              <div className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">Selected Primary Targets</span>
+                <p className="text-2xl font-extrabold text-amber-400 mt-1">{report.summary.targetsWithPrimaryPersonSelected}</p>
+              </div>
+            </div>
 
-                      return (
-                        <div
-                          key={p.id}
-                          className="flex flex-col text-xs font-mono p-2 bg-white rounded border border-gray-100 space-y-2"
-                        >
-                          <div className="text-gray-800 font-medium">
-                            {p.nodes
-                              .map((n) => personMap.get(n.id) || n.id)
-                              .join(" → ")}
-                          </div>
-                          <div>
+            {/* Navigation Tabs */}
+            <div className="flex border-b border-slate-800 text-sm font-medium">
+              <button
+                onClick={() => setActiveTab("visual")}
+                className={`px-4 py-2 border-b-2 transition ${
+                  activeTab === "visual"
+                    ? "border-emerald-500 text-emerald-400 font-semibold"
+                    : "border-transparent text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Target Decisions Visualizer
+              </button>
+              <button
+                onClick={() => setActiveTab("json")}
+                className={`px-4 py-2 border-b-2 transition ${
+                  activeTab === "json"
+                    ? "border-emerald-500 text-emerald-400 font-semibold"
+                    : "border-transparent text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Raw Report (report.json)
+              </button>
+            </div>
+
+            {/* Visual View */}
+            {activeTab === "visual" && (
+              <div className="grid grid-cols-1 gap-6">
+                {report.targetReports.map((target) => {
+                  const primaryPerson = target.selection.primaryTargetPersonName || "No Person Selected";
+                  const primaryEval = target.selection.evaluations.find(
+                    (e) => e.personId === target.selection.primaryTargetPersonId
+                  );
+
+                  return (
+                    <div
+                      key={target.targetInvestorId}
+                      className="bg-slate-800/50 border border-slate-700/60 rounded-xl p-6 space-y-5 shadow-sm"
+                    >
+                      {/* Target Header */}
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-700/50 pb-4">
+                        <div>
+                          <h2 className="text-xl font-bold text-white">
+                            {target.investorOrganizationName}
+                          </h2>
+                          <span className="text-xs text-slate-400 font-mono">
+                            ID: {target.targetInvestorId} ({target.investorOrganizationId})
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {target.diagnosticFlags.map((flag) => (
                             <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${statusBadgeClass}`}
+                              key={flag}
+                              className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold uppercase ${
+                                flag === "CONFIRMATION_REQUIRED"
+                                  ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                  : flag === "ALL_PATHS_REJECTED"
+                                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  : flag === "NO_KNOWN_PATH"
+                                  ? "bg-slate-700/50 text-slate-300 border border-slate-600"
+                                  : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                              }`}
                             >
-                              {statusBadgeText}
+                              {flag.replace(/_/g, " ")}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Primary Person Selection Section */}
+                      <div className="bg-slate-900/80 border border-slate-700/80 rounded-lg p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold block">
+                              Selected Target Person
+                            </span>
+                            <span className="text-lg font-bold text-emerald-400">
+                              {primaryPerson}
                             </span>
                           </div>
-
-                          {isRetained && scoredPathObj ? (
-                            <div className="pt-1.5 border-t border-gray-100 space-y-1 text-gray-700">
-                              <div className="flex justify-between items-center text-sm font-bold text-gray-900">
-                                <span>Priority Index:</span>
-                                <span>{scoredPathObj.score.overallPriorityIndex} / 100</span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
-                                <div>Credibility: {scoredPathObj.score.relationshipCredibility}</div>
-                                <div>Freshness: {scoredPathObj.score.temporalFreshness}</div>
-                                <div>Confirmation: {scoredPathObj.score.confirmationReadiness}</div>
-                                <div>Efficiency: {scoredPathObj.score.pathEfficiency}</div>
-                              </div>
-                              <div className="text-[10px] text-amber-700 bg-amber-50/70 p-1 rounded font-sans font-semibold mt-1">
-                                UNCALIBRATED HEURISTIC — NOT A PROBABILITY
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-[11px] text-gray-500 italic pt-1 border-t border-gray-100">
-                              NOT SCORED
+                          {primaryEval && (
+                            <div className="text-right">
+                              <span className="text-xs text-slate-400 uppercase tracking-wider block">Target Priority</span>
+                              <span className="text-2xl font-extrabold text-emerald-400">
+                                {primaryEval.overallTargetPriorityIndex} <span className="text-xs font-normal text-slate-400">/ 100</span>
+                              </span>
                             </div>
                           )}
                         </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-xs text-gray-500 font-mono italic p-2 bg-white rounded border border-gray-100">
-                      <div>
-                        {generationResult.executionStatus === "error"
-                          ? "Upstream generation error"
-                          : rejectionResult.disposition === "upstream_paths_filtered"
-                          ? "Confirmation paths filtered upstream"
-                          : "NO GENERATED PATH"}
+
+                        {primaryEval && (
+                          <div className="pt-3 border-t border-slate-800 space-y-2 text-xs">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                              <div className="bg-slate-800/80 p-2 rounded border border-slate-700/50">
+                                <span className="text-slate-400 block text-[10px]">Mandate Fit (70%)</span>
+                                <span className="text-slate-200 font-mono font-bold text-sm">{primaryEval.mandateFitIndex} / 100</span>
+                              </div>
+                              <div className="bg-slate-800/80 p-2 rounded border border-slate-700/50">
+                                <span className="text-slate-400 block text-[10px]">Access Quality (30%)</span>
+                                <span className="text-slate-200 font-mono font-bold text-sm">{primaryEval.accessQualityIndex} / 100</span>
+                              </div>
+                              <div className="bg-slate-800/80 p-2 rounded border border-slate-700/50">
+                                <span className="text-slate-400 block text-[10px]">Role Score</span>
+                                <span className="text-slate-200 font-mono font-bold text-sm">{primaryEval.investmentRoleScore} ({primaryEval.roleTitle})</span>
+                              </div>
+                              <div className="bg-slate-800/80 p-2 rounded border border-slate-700/50">
+                                <span className="text-slate-400 block text-[10px]">Stage / Sector / Geo</span>
+                                <span className="text-slate-200 font-mono font-bold text-xs uppercase">
+                                  {primaryEval.stageFitStatus} | {primaryEval.sectorFitStatus} | {primaryEval.geographyFitStatus}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-slate-400 italic text-xs leading-relaxed pt-1">
+                              {primaryEval.explanation}
+                            </p>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-[11px] text-gray-500 italic pt-1 mt-1 border-t border-gray-100">
-                        NOT SCORED
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
 
-        {/* Target Person Selection Results */}
-        <div className="border-t border-gray-100 pt-5 text-left mb-5 space-y-3">
-          <span className="text-xs uppercase tracking-wider text-gray-500 font-medium block mb-2">
-            Target Person Selection by Investor
-          </span>
-          {targets.map(({ targetId, orgName, selectionResult }) => {
-            const primaryId = selectionResult.primaryTargetPersonId;
-            const primaryName = primaryId ? personMap.get(primaryId) || primaryId : "None Selected";
-            const primaryEval = selectionResult.evaluations.find((e) => e.personId === primaryId);
-
-            return (
-              <div
-                key={targetId}
-                className="p-3 rounded-lg border border-gray-100 bg-gray-50/50 space-y-2 text-xs font-mono"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-900 text-sm font-sans">
-                    {orgName}
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium uppercase text-indigo-700 bg-indigo-50 border-indigo-200">
-                    {selectionResult.disposition.replace(/_/g, " ")}
-                  </span>
-                </div>
-
-                <div className="p-2.5 bg-white rounded border border-gray-100 space-y-1.5">
-                  <div className="flex justify-between items-center text-sm font-bold text-gray-900 font-sans">
-                    <span>Target Person: <span className="text-indigo-600">{primaryName}</span></span>
-                    {primaryEval && (
-                      <span className="text-emerald-700 font-mono">
-                        Priority: {primaryEval.overallTargetPriorityIndex} / 100
-                      </span>
-                    )}
-                  </div>
-
-                  {primaryEval && (
-                    <div className="space-y-1 text-gray-700 pt-1 border-t border-gray-100">
-                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
-                        <div>Role: {primaryEval.roleTitle} ({primaryEval.investmentRole})</div>
-                        <div>Mandate Fit: {primaryEval.mandateFitIndex} / 100</div>
-                        <div>Access Quality: {primaryEval.accessQualityIndex} / 100</div>
-                        <div>Role Score: {primaryEval.investmentRoleScore}</div>
-                        <div>Stage Fit: {primaryEval.stageFitStatus}</div>
-                        <div>Sector Fit: {primaryEval.sectorFitStatus}</div>
-                      </div>
-                      <p className="text-[10px] font-sans text-gray-500 italic mt-1 leading-snug">
-                        {primaryEval.explanation}
-                      </p>
-                      <div className="text-[10px] text-amber-700 bg-amber-50/70 p-1 rounded font-sans font-semibold mt-1">
-                        TARGET PRIORITY = UNCALIBRATED HEURISTIC
+                      {/* Scored Paths Section */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                          Retained Access Paths ({target.scoring.scoredPathCount})
+                        </span>
+                        {target.scoring.scoredPaths.length > 0 ? (
+                          target.scoring.scoredPaths.map((sp) => (
+                            <div
+                              key={sp.pathId}
+                              className="bg-slate-900/50 border border-slate-800 rounded-lg p-3 space-y-2 font-mono text-xs"
+                            >
+                              <div className="flex justify-between items-center text-slate-200 font-semibold">
+                                <span className="truncate pr-2">{sp.pathId}</span>
+                                <span className="text-emerald-400 font-bold">Priority Index: {sp.overallPriorityIndex}/100</span>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                                <div>Credibility: <span className="text-slate-200">{sp.componentScores.relationshipCredibility}</span></div>
+                                <div>Freshness: <span className="text-slate-200">{sp.componentScores.temporalFreshness}</span></div>
+                                <div>Confirmation: <span className="text-slate-200">{sp.componentScores.confirmationReadiness}</span></div>
+                                <div>Efficiency: <span className="text-slate-200">{sp.componentScores.pathEfficiency}</span></div>
+                              </div>
+                              <p className="text-[10px] text-slate-400 font-sans italic pt-1">
+                                {sp.explanation}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-3 bg-slate-900/30 border border-slate-800 rounded-lg text-xs text-slate-500 italic">
+                            No retained scored paths available for this target investor.
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            )}
 
-        <div className="border-t border-gray-100 pt-4 text-sm flex justify-between items-center">
-          <span className="text-gray-500">Dataset integrity:</span>
-          <span
-            className={
-              integrity.valid
-                ? "font-semibold text-emerald-600"
-                : "font-semibold text-red-600"
-            }
-          >
-            {integrity.valid ? "VALID" : "INVALID"}
-          </span>
-        </div>
+            {/* JSON View */}
+            {activeTab === "json" && (
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 overflow-x-auto">
+                <pre className="text-xs font-mono text-emerald-400 leading-relaxed">
+                  {JSON.stringify(report, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );
