@@ -16,7 +16,7 @@ The **Real-Data Pilot Harness** enables founders and investment teams to run Arc
 
 > [!NOTE]
 > **SINGLE-STARTUP / SINGLE-CAMPAIGN CONTRACT (v1)**
-> Each pilot CSV bundle represents **EXACTLY 1 STARTUP** and **EXACTLY 1 FUNDRAISING CAMPAIGN**. The campaign's founders are derived dynamically from active `founder_of` relationships pointing to the resolved startup organization.
+> Each pilot CSV bundle represents **EXACTLY 1 STARTUP** and **EXACTLY 1 FUNDRAISING CAMPAIGN**. The campaign's active founders are explicitly specified in `campaign.csv founderPersonIds`. This identifies the founders actively participating in THIS fundraising campaign (not every person who has ever founded the company).
 
 ---
 
@@ -34,7 +34,7 @@ cp data/templates/real-pilot/*.csv private-data/my-startup-pilot/
 Open the CSV files in your spreadsheet editor (e.g., Google Sheets, Excel, Numbers) or text editor and populate your campaign data:
 
 1. `startup.csv` — Single startup details (name, stage, sector, geography).
-2. `campaign.csv` — Single fundraising campaign details (round, status, creation date).
+2. `campaign.csv` — Single fundraising campaign details (active founder IDs, round, status, creation date).
 3. `organizations.csv` — Companies, VC funds, corporate entities, advisory firms in your network.
 4. `people.csv` — Founders, advisors, VC partners, colleagues, intermediaries.
 5. `targets.csv` — Target investor organizations and candidate contacts at each firm.
@@ -48,7 +48,7 @@ The pilot harness enforces strict entity validation while permitting reasonable 
 | File | Required Fields | Optional Fields | Notes / Mapping Rules |
 | :--- | :--- | :--- | :--- |
 | `startup.csv` | `startupId`, `name` | `website`, `geography`, `sector`, `stage` | Blank optional cells yield `undefined`. Headers mandatory. |
-| `campaign.csv` | `campaignId`, `startupId`, `status`, `createdAt` | `round` | Blank `round` maps to `""` (empty string). Headers mandatory. |
+| `campaign.csv` | `campaignId`, `startupId`, `founderPersonIds`, `status`, `createdAt` | `round` | `founderPersonIds` is pipe-delimited list of active campaign founders (at least 1 required). Blank `round` maps to `""` (empty string). Headers mandatory. |
 | `evidence.csv` | `evidenceId`, `relationshipId`, `type`, `description` | `observedAt`, `sourceName`, `sourceUrl` | Blank optional cells yield `undefined`. Populated `observedAt` must be valid date. Headers mandatory. |
 | `evidence.csv` (interaction) | N/A | `interactionOccurredAt`, `interactionReciprocity`, `interactionStatus` | Optional, but if ANY interaction field is populated, all three are required. |
 

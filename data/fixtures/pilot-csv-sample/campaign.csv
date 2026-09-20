@@ -1,2 +1,2 @@
-campaignId,startupId,round,status,createdAt
-campaign-nexus-seed,startup-nexus,Seed,active,2026-09-01T00:00:00.000Z
+campaignId,startupId,founderPersonIds,round,status,createdAt
+campaign-nexus-seed,startup-nexus,person-founder-elena,Seed,active,2026-09-01T00:00:00.000Z

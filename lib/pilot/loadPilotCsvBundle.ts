@@ -54,7 +54,7 @@ const REQUIRED_FILES = [
 
 const REQUIRED_HEADERS: Record<string, string[]> = {
   "startup.csv": ["startupId", "name", "website", "geography", "sector", "stage"],
-  "campaign.csv": ["campaignId", "startupId", "round", "status", "createdAt"],
+  "campaign.csv": ["campaignId", "startupId", "founderPersonIds", "round", "status", "createdAt"],
   "organizations.csv": ["organizationId", "name", "type", "website", "geography"],
   "people.csv": [
     "personId",
@@ -480,9 +480,28 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
   for (const raw of campaignRes.records) {
     const idRes = parseRequiredString(raw.campaignId, "campaignId", "campaign.csv", rowIdx);
     const startupIdRes = parseRequiredString(raw.startupId, "startupId", "campaign.csv", rowIdx);
+    const founderPipe = parsePipeList(
+      raw.founderPersonIds,
+      "founderPersonIds",
+      "campaign.csv",
+      rowIdx,
+      false
+    );
     const round = parseOptionalString(raw.round) ?? "";
     const statusRes = parseRequiredString(raw.status, "status", "campaign.csv", rowIdx);
     const createdAtRes = parseValidDate(raw.createdAt, "createdAt", "campaign.csv", rowIdx, true);
+
+    if (founderPipe.error) {
+      errors.push(founderPipe.error);
+    } else if (founderPipe.values.length === 0) {
+      errors.push({
+        file: "campaign.csv",
+        row: rowIdx,
+        field: "founderPersonIds",
+        code: "NO_CAMPAIGN_FOUNDERS",
+        message: "Fundraising campaign must specify at least 1 explicit founder in founderPersonIds.",
+      });
+    }
 
     if (!idRes.value || !startupIdRes.value || !statusRes.value || !createdAtRes.value) {
       if (idRes.error) errors.push(idRes.error);
@@ -505,10 +524,10 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
       campaigns.push({
         id: idRes.value,
         startupId: startupIdRes.value,
+        founderPersonIds: founderPipe.values,
         round,
         status: statusRes.value as CampaignStatus,
         createdAt: createdAtRes.value,
-        founderPersonIds: [], // Will be populated via derivation
       });
     }
     rowIdx++;
@@ -981,62 +1000,7 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
     return { status: "error", errors, warnings };
   }
 
-  // 10. Startup Organization Resolution & Founder Derivation (Requirements 10 & 11)
-  const singleStartup = startups[0];
-  const matchingOrgs = organizations.filter(
-    (org) =>
-      org.type === "startup" &&
-      (org.id === singleStartup.id ||
-        org.name.trim().toLowerCase() === singleStartup.name.trim().toLowerCase())
-  );
-
-  if (matchingOrgs.length === 0) {
-    errors.push({
-      file: "organizations.csv",
-      code: "STARTUP_ORGANIZATION_NOT_FOUND",
-      message: `No startup Organization found matching startup "${singleStartup.name}" (${singleStartup.id}).`,
-    });
-  } else if (matchingOrgs.length > 1) {
-    errors.push({
-      file: "organizations.csv",
-      code: "AMBIGUOUS_STARTUP_ORGANIZATION",
-      message: `Multiple startup Organizations found matching startup "${singleStartup.name}" (${singleStartup.id}).`,
-    });
-  }
-
-  if (errors.length > 0) {
-    return { status: "error", errors, warnings };
-  }
-
-  const resolvedStartupOrg = matchingOrgs[0];
-
-  // Derive campaign.founderPersonIds
-  const singleCampaign = campaigns[0];
-  const founderRels = relationships.filter(
-    (r) =>
-      r.type === "founder_of" &&
-      ((r.to.type === "organization" && r.to.id === resolvedStartupOrg.id) ||
-        (r.from.type === "organization" && r.from.id === resolvedStartupOrg.id))
-  );
-
-  const founderIdsSet = new Set<string>();
-  for (const rel of founderRels) {
-    if (rel.from.type === "person") founderIdsSet.add(rel.from.id);
-    if (rel.to.type === "person") founderIdsSet.add(rel.to.id);
-  }
-
-  singleCampaign.founderPersonIds = Array.from(founderIdsSet);
-
-  if (singleCampaign.founderPersonIds.length === 0) {
-    errors.push({
-      file: "relationships.csv",
-      code: "NO_CAMPAIGN_FOUNDERS",
-      message: "Fundraising campaign has 0 derived founder person IDs.",
-    });
-    return { status: "error", errors, warnings };
-  }
-
-  // 11. Construct PathwayDataset and validate integrity
+  // 10. Construct PathwayDataset and validate integrity
   const dataset: PathwayDataset = {
     startups,
     campaigns,

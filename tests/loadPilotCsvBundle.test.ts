@@ -253,7 +253,7 @@ describe("loadPilotCsvBundle", () => {
 
   it("22. returns error for zero campaigns", () => {
     const campPath = path.join(tempDir, "campaign.csv");
-    fs.writeFileSync(campPath, "campaignId,startupId,round,status,createdAt\n", "utf8");
+    fs.writeFileSync(campPath, "campaignId,startupId,founderPersonIds,round,status,createdAt\n", "utf8");
 
     const result = loadPilotCsvBundle(tempDir);
     expect(result.status).toBe("error");
@@ -263,7 +263,7 @@ describe("loadPilotCsvBundle", () => {
   it("23. returns error for multiple campaigns", () => {
     const campPath = path.join(tempDir, "campaign.csv");
     let content = fs.readFileSync(campPath, "utf8");
-    content += "campaign-two,startup-nexus,Series A,active,2026-09-01T00:00:00.000Z\n";
+    content += "campaign-two,startup-nexus,person-founder-elena,Series A,active,2026-09-01T00:00:00.000Z\n";
     fs.writeFileSync(campPath, content, "utf8");
 
     const result = loadPilotCsvBundle(tempDir);
@@ -271,26 +271,25 @@ describe("loadPilotCsvBundle", () => {
     expect(result.errors.some((e) => e.code === "INVALID_CAMPAIGN_COUNT")).toBe(true);
   });
 
-  it("24. returns error for zero derived founders (NO_CAMPAIGN_FOUNDERS)", () => {
-    const relPath = path.join(tempDir, "relationships.csv");
-    let content = fs.readFileSync(relPath, "utf8");
-    content = content.replace(",founder_of,", ",works_at,");
-    fs.writeFileSync(relPath, content, "utf8");
+  it("24. returns error for blank founderPersonIds (NO_CAMPAIGN_FOUNDERS)", () => {
+    const campPath = path.join(tempDir, "campaign.csv");
+    let content = fs.readFileSync(campPath, "utf8");
+    content = content.replace(",person-founder-elena,", ",,");
+    fs.writeFileSync(campPath, content, "utf8");
 
     const result = loadPilotCsvBundle(tempDir);
     expect(result.status).toBe("error");
     expect(result.errors.some((e) => e.code === "NO_CAMPAIGN_FOUNDERS")).toBe(true);
   });
 
-  it("25. returns error for ambiguous startup organization", () => {
+  it("25. startup loading succeeds even if no startup organization exists", () => {
     const orgPath = path.join(tempDir, "organizations.csv");
     let content = fs.readFileSync(orgPath, "utf8");
-    content += "\norg-nexus-dupe,Nexus AI,startup,https://nexus-ai-example.com,\"San Francisco, CA\"\n";
+    content = content.replace(",startup,", ",vc_fund,");
     fs.writeFileSync(orgPath, content, "utf8");
 
     const result = loadPilotCsvBundle(tempDir);
-    expect(result.status).toBe("error");
-    expect(result.errors.some((e) => e.code === "AMBIGUOUS_STARTUP_ORGANIZATION")).toBe(true);
+    expect(result.status).toBe("success");
   });
 
   it("26. returns error for missing target candidates", () => {
@@ -377,5 +376,84 @@ describe("loadPilotCsvBundle", () => {
     const result = loadPilotCsvBundle(tempDir);
     expect(result.status).toBe("error");
     expect(result.errors.some((e) => e.code === "INVALID_DATE")).toBe(true);
+  });
+
+  it("54. loads multiple explicit campaign founders cleanly", () => {
+    const campPath = path.join(tempDir, "campaign.csv");
+    let content = fs.readFileSync(campPath, "utf8");
+    content = content.replace("person-founder-elena", "person-founder-elena|person-vc-sarah");
+    fs.writeFileSync(campPath, content, "utf8");
+
+    const result = loadPilotCsvBundle(tempDir);
+    expect(result.status).toBe("success");
+    expect(result.dataset!.campaigns[0].founderPersonIds).toEqual([
+      "person-founder-elena",
+      "person-vc-sarah",
+    ]);
+  });
+
+  it("55. returns error for duplicate founder IDs in campaign.csv", () => {
+    const campPath = path.join(tempDir, "campaign.csv");
+    let content = fs.readFileSync(campPath, "utf8");
+    content = content.replace("person-founder-elena", "person-founder-elena|person-founder-elena");
+    fs.writeFileSync(campPath, content, "utf8");
+
+    const result = loadPilotCsvBundle(tempDir);
+    expect(result.status).toBe("error");
+    expect(result.errors.some((e) => e.code === "DUPLICATE_PIPE_ITEM")).toBe(true);
+  });
+
+  it("56. returns DATASET_INTEGRITY_ERROR for nonexistent founder ID in campaign.csv", () => {
+    const campPath = path.join(tempDir, "campaign.csv");
+    let content = fs.readFileSync(campPath, "utf8");
+    content = content.replace("person-founder-elena", "nonexistent-founder-person");
+    fs.writeFileSync(campPath, content, "utf8");
+
+    const result = loadPilotCsvBundle(tempDir);
+    expect(result.status).toBe("error");
+    expect(result.errors.some((e) => e.code === "DATASET_INTEGRITY_ERROR")).toBe(true);
+  });
+
+  it("57. historical founder_of relationship does NOT add to campaign founders", () => {
+    const relPath = path.join(tempDir, "relationships.csv");
+    let relContent = fs.readFileSync(relPath, "utf8");
+    relContent += "\nrel-other-founder,person,person-vc-david,organization,org-nexus,founder_of,directed,ev-other-founder-web,2020-01-01,2022-01-01,2022-01-01\n";
+    fs.writeFileSync(relPath, relContent, "utf8");
+
+    const evPath = path.join(tempDir, "evidence.csv");
+    let evContent = fs.readFileSync(evPath, "utf8");
+    evContent += "\nev-other-founder-web,rel-other-founder,company_website,Historical founder,2022-01-01T00:00:00.000Z,Web,https://nexus.com,,,\n";
+    fs.writeFileSync(evPath, evContent, "utf8");
+
+    const result = loadPilotCsvBundle(tempDir);
+    expect(result.status).toBe("success");
+    expect(result.dataset!.campaigns[0].founderPersonIds).toEqual(["person-founder-elena"]);
+  });
+
+  it("58. reversed founder_of relationship does NOT add to campaign founders", () => {
+    const relPath = path.join(tempDir, "relationships.csv");
+    let relContent = fs.readFileSync(relPath, "utf8");
+    relContent += "\nrel-reversed-founder,organization,org-nexus,person,person-vc-david,founder_of,directed,ev-reversed-founder-web,2020-01-01,,2022-01-01\n";
+    fs.writeFileSync(relPath, relContent, "utf8");
+
+    const evPath = path.join(tempDir, "evidence.csv");
+    let evContent = fs.readFileSync(evPath, "utf8");
+    evContent += "\nev-reversed-founder-web,rel-reversed-founder,company_website,Reversed founder,2022-01-01T00:00:00.000Z,Web,https://nexus.com,,,\n";
+    fs.writeFileSync(evPath, evContent, "utf8");
+
+    const result = loadPilotCsvBundle(tempDir);
+    expect(result.status).toBe("success");
+    expect(result.dataset!.campaigns[0].founderPersonIds).toEqual(["person-founder-elena"]);
+  });
+
+  it("59. loads explicit campaign founders cleanly even if no founder_of relationships exist", () => {
+    const relPath = path.join(tempDir, "relationships.csv");
+    let content = fs.readFileSync(relPath, "utf8");
+    content = content.replace(",founder_of,", ",works_at,");
+    fs.writeFileSync(relPath, content, "utf8");
+
+    const result = loadPilotCsvBundle(tempDir);
+    expect(result.status).toBe("success");
+    expect(result.dataset!.campaigns[0].founderPersonIds).toEqual(["person-founder-elena"]);
   });
 });
