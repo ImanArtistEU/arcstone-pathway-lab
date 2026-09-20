@@ -133,7 +133,7 @@ GitHub Actions CI (`.github/workflows/ci.yml`) independently validates every com
 * ESLint validation (`npm run lint`)
 * Production build (`npm run build`)
 
-## Planned High-Level Deterministic Pipeline
+## High-Level Deterministic Pipeline
 
 ```
 PathwayDataset [IMPLEMENTED]
@@ -148,9 +148,12 @@ Path Scoring [IMPLEMENTED]
       ↓
 Target Person Selection [IMPLEMENTED]
       ↓
-Real-Data Pilot Harness [IMPLEMENTED]
-      ↓
 Explanation / Recommended Action [PLANNED]
       ↓
 Outcome / Founder Feedback [PLANNED]
 ```
+
+## Validation Harness
+
+* **Pilot Harness (`analyzePilotDataset`, `loadPilotCsvBundle`, `runPilot.ts`)**: A wrapper validation harness that ingests real-world CSV dataset bundles, normalizes raw entities, validates strict contract constraints (single startup, single campaign, derived founders, candidate people, status requirements), and executes the frozen decision pipeline. It is strictly decoupled from pipeline heuristics, never mutates state, and guarantees 100% deterministic, byte-equivalent JSON and Markdown report outputs for identical inputs and reference dates.
+

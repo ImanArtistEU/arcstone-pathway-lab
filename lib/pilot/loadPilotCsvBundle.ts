@@ -41,6 +41,76 @@ export interface PilotBundleLoadResult {
   warnings: string[];
 }
 
+const REQUIRED_FILES = [
+  "startup.csv",
+  "campaign.csv",
+  "organizations.csv",
+  "people.csv",
+  "targets.csv",
+  "relationships.csv",
+  "evidence.csv",
+  "target-person-profiles.csv",
+];
+
+const REQUIRED_HEADERS: Record<string, string[]> = {
+  "startup.csv": ["startupId", "name", "website", "geography", "sector", "stage"],
+  "campaign.csv": ["campaignId", "startupId", "round", "status", "createdAt"],
+  "organizations.csv": ["organizationId", "name", "type", "website", "geography"],
+  "people.csv": [
+    "personId",
+    "firstName",
+    "lastName",
+    "fullName",
+    "linkedinUrl",
+    "currentOrganizationIds",
+    "location",
+  ],
+  "targets.csv": [
+    "targetInvestorId",
+    "campaignId",
+    "investorOrganizationId",
+    "candidatePersonIds",
+    "status",
+  ],
+  "relationships.csv": [
+    "relationshipId",
+    "fromType",
+    "fromId",
+    "toType",
+    "toId",
+    "type",
+    "direction",
+    "evidenceIds",
+    "startedAt",
+    "endedAt",
+    "lastObservedAt",
+  ],
+  "evidence.csv": [
+    "evidenceId",
+    "relationshipId",
+    "type",
+    "description",
+    "observedAt",
+    "sourceName",
+    "sourceUrl",
+    "interactionOccurredAt",
+    "interactionReciprocity",
+    "interactionStatus",
+  ],
+  "target-person-profiles.csv": [
+    "targetInvestorId",
+    "personId",
+    "roleTitle",
+    "investmentRole",
+    "stageFocus",
+    "sectorFocus",
+    "geographyFocus",
+    "observedAt",
+    "sourceName",
+    "sourceUrl",
+  ],
+};
+
 const VALID_ORGANIZATION_TYPES: OrganizationType[] = [
   "startup",
   "vc_fund",
@@ -145,8 +215,8 @@ function parsePipeList(
           file,
           row,
           field: fieldName,
-          code: "EMPTY_PIPE_ITEM",
-          message: `Empty item detected in pipe-delimited list for field "${fieldName}".`,
+          code: "INVALID_PIPE_LIST",
+          message: `Contains empty element in pipe-delimited list for field "${fieldName}".`,
         },
       };
     }
@@ -158,7 +228,7 @@ function parsePipeList(
           row,
           field: fieldName,
           code: "DUPLICATE_PIPE_ITEM",
-          message: `Duplicate item "${trimmed}" in pipe-delimited field "${fieldName}".`,
+          message: `Duplicate item "${trimmed}" in pipe-delimited list for field "${fieldName}".`,
         },
       };
     }
@@ -169,14 +239,41 @@ function parsePipeList(
   return { values: result };
 }
 
-function validateDateField(
-  raw: string | undefined,
+function parseOptionalString(val: string | undefined): string | undefined {
+  if (!val || val.trim().length === 0) return undefined;
+  return val.trim();
+}
+
+function parseRequiredString(
+  val: string | undefined,
+  fieldName: string,
+  file: string,
+  row?: number
+): { value?: string; error?: PilotBundleError } {
+  const parsed = parseOptionalString(val);
+  if (!parsed) {
+    return {
+      error: {
+        file,
+        row,
+        field: fieldName,
+        code: "MISSING_REQUIRED_FIELD",
+        message: `Missing required field "${fieldName}" in "${file}".`,
+      },
+    };
+  }
+  return { value: parsed };
+}
+
+function parseValidDate(
+  val: string | undefined,
   fieldName: string,
   file: string,
   row?: number,
   required = false
 ): { value?: string; error?: PilotBundleError } {
-  if (!raw || raw.trim().length === 0) {
+  const str = parseOptionalString(val);
+  if (!str) {
     if (required) {
       return {
         error: {
@@ -184,510 +281,785 @@ function validateDateField(
           row,
           field: fieldName,
           code: "MISSING_REQUIRED_FIELD",
-          message: `Required date field "${fieldName}" is missing or empty.`,
+          message: `Missing required date field "${fieldName}" in "${file}".`,
         },
       };
     }
-    return { value: undefined };
+    return {};
   }
 
-  const trimmed = raw.trim();
-  const parsed = Date.parse(trimmed);
-  if (Number.isNaN(parsed)) {
+  const d = new Date(str);
+  if (isNaN(d.getTime())) {
     return {
       error: {
         file,
         row,
         field: fieldName,
         code: "INVALID_DATE",
-        message: `Field "${fieldName}" contains invalid date string "${trimmed}".`,
+        message: `Invalid date string "${val}" for field "${fieldName}" in "${file}".`,
       },
     };
   }
 
-  return { value: trimmed };
-}
-
-function parseCsvFile<T extends Record<string, string>>(
-  dirPath: string,
-  filename: string,
-  errors: PilotBundleError[]
-): T[] | undefined {
-  const filePath = path.join(dirPath, filename);
-  if (!fs.existsSync(filePath)) {
-    errors.push({
-      file: filename,
-      code: "FILE_NOT_FOUND",
-      message: `Required CSV file "${filename}" not found in directory "${dirPath}".`,
-    });
-    return undefined;
-  }
-
-  try {
-    const content = fs.readFileSync(filePath, "utf8");
-    const records = parse(content, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-    }) as T[];
-    return records;
-  } catch (err: unknown) {
-    errors.push({
-      file: filename,
-      code: "CSV_PARSE_ERROR",
-      message: `Failed to parse CSV file "${filename}": ${err instanceof Error ? err.message : String(err)}`,
-    });
-    return undefined;
-  }
+  return { value: str };
 }
 
 export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
   const errors: PilotBundleError[] = [];
   const warnings: string[] = [];
 
-  const startupRows = parseCsvFile<Record<string, string>>(dirPath, "startup.csv", errors);
-  const campaignRows = parseCsvFile<Record<string, string>>(dirPath, "campaign.csv", errors);
-  const orgRows = parseCsvFile<Record<string, string>>(dirPath, "organizations.csv", errors);
-  const peopleRows = parseCsvFile<Record<string, string>>(dirPath, "people.csv", errors);
-  const targetRows = parseCsvFile<Record<string, string>>(dirPath, "targets.csv", errors);
-  const relRows = parseCsvFile<Record<string, string>>(dirPath, "relationships.csv", errors);
-  const evidenceRows = parseCsvFile<Record<string, string>>(dirPath, "evidence.csv", errors);
-  const profileRows = parseCsvFile<Record<string, string>>(
-    dirPath,
-    "target-person-profiles.csv",
-    errors
-  );
+  const resolvedDir = path.resolve(dirPath);
+
+  if (!fs.existsSync(resolvedDir) || !fs.statSync(resolvedDir).isDirectory()) {
+    return {
+      status: "error",
+      errors: [
+        {
+          file: dirPath,
+          code: "FILE_NOT_FOUND",
+          message: `Directory does not exist: "${resolvedDir}".`,
+        },
+      ],
+      warnings: [],
+    };
+  }
+
+  // 1. Verify existence of required CSV files
+  for (const fileName of REQUIRED_FILES) {
+    const filePath = path.join(resolvedDir, fileName);
+    if (!fs.existsSync(filePath)) {
+      errors.push({
+        file: fileName,
+        code: "FILE_NOT_FOUND",
+        message: `Required CSV file "${fileName}" is missing in directory "${resolvedDir}".`,
+      });
+    }
+  }
 
   if (errors.length > 0) {
     return { status: "error", errors, warnings };
   }
 
-  // 1. Parse Startups
-  const startups: Startup[] = [];
-  for (let i = 0; i < (startupRows?.length || 0); i++) {
-    const row = startupRows![i];
-    const rNum = i + 2;
+  // Helper to read and validate headers for a CSV file
+  function readCsvRecords(fileName: string): { records: Record<string, string>[]; headerError?: PilotBundleError } {
+    const filePath = path.join(resolvedDir, fileName);
+    const fileContent = fs.readFileSync(filePath, "utf8");
 
-    const startupId = row.startupId?.trim();
-    const name = row.name?.trim();
-    if (!startupId) {
-      errors.push({ file: "startup.csv", row: rNum, field: "startupId", code: "MISSING_REQUIRED_FIELD", message: "startupId is required." });
-    }
-    if (!name) {
-      errors.push({ file: "startup.csv", row: rNum, field: "name", code: "MISSING_REQUIRED_FIELD", message: "name is required." });
+    // Check header row first
+    const lines = fileContent.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length === 0) {
+      return { records: [] };
     }
 
-    if (startupId && name) {
-      startups.push({
-        id: startupId,
-        name,
-        website: row.website?.trim() || undefined,
-        geography: row.geography?.trim() || undefined,
-        sector: row.sector?.trim() || undefined,
-        stage: row.stage?.trim() || undefined,
-      });
-    }
-  }
-
-  // 2. Parse Campaigns
-  const campaigns: FundraisingCampaign[] = [];
-  for (let i = 0; i < (campaignRows?.length || 0); i++) {
-    const row = campaignRows![i];
-    const rNum = i + 2;
-
-    const campaignId = row.campaignId?.trim();
-    const startupId = row.startupId?.trim();
-    const round = row.round?.trim() || undefined;
-    const statusRaw = row.status?.trim();
-    const createdAtRes = validateDateField(row.createdAt, "createdAt", "campaign.csv", rNum, true);
-
-    if (!campaignId) {
-      errors.push({ file: "campaign.csv", row: rNum, field: "campaignId", code: "MISSING_REQUIRED_FIELD", message: "campaignId is required." });
-    }
-    if (!startupId) {
-      errors.push({ file: "campaign.csv", row: rNum, field: "startupId", code: "MISSING_REQUIRED_FIELD", message: "startupId is required." });
-    }
-    if (createdAtRes.error) {
-      errors.push(createdAtRes.error);
+    const firstLineRecords = parse(lines[0], { trim: true });
+    if (!firstLineRecords || firstLineRecords.length === 0) {
+      return { records: [] };
     }
 
-    if (statusRaw && !VALID_CAMPAIGN_STATUSES.includes(statusRaw as CampaignStatus)) {
-      errors.push({ file: "campaign.csv", row: rNum, field: "status", code: "INVALID_ENUM", message: `Invalid campaign status "${statusRaw}".` });
-    }
+    const actualHeaders: string[] = firstLineRecords[0] || [];
+    const expectedHeaders = REQUIRED_HEADERS[fileName] || [];
 
-    if (campaignId && startupId && createdAtRes.value) {
-      campaigns.push({
-        id: campaignId,
-        startupId,
-        founderPersonIds: [], // populated after people parse
-        round: round || "",
-        status: (statusRaw as CampaignStatus) || "active",
-        createdAt: createdAtRes.value,
-      });
-    }
-  }
-
-  // 3. Parse Organizations
-  const organizations: Organization[] = [];
-  for (let i = 0; i < (orgRows?.length || 0); i++) {
-    const row = orgRows![i];
-    const rNum = i + 2;
-
-    const organizationId = row.organizationId?.trim();
-    const name = row.name?.trim();
-    const typeRaw = row.type?.trim();
-
-    if (!organizationId) {
-      errors.push({ file: "organizations.csv", row: rNum, field: "organizationId", code: "MISSING_REQUIRED_FIELD", message: "organizationId is required." });
-    }
-    if (!name) {
-      errors.push({ file: "organizations.csv", row: rNum, field: "name", code: "MISSING_REQUIRED_FIELD", message: "name is required." });
-    }
-    if (!typeRaw) {
-      errors.push({ file: "organizations.csv", row: rNum, field: "type", code: "MISSING_REQUIRED_FIELD", message: "type is required." });
-    } else if (!VALID_ORGANIZATION_TYPES.includes(typeRaw as OrganizationType)) {
-      errors.push({ file: "organizations.csv", row: rNum, field: "type", code: "INVALID_ENUM", message: `Invalid organization type "${typeRaw}".` });
-    }
-
-    if (organizationId && name && typeRaw && VALID_ORGANIZATION_TYPES.includes(typeRaw as OrganizationType)) {
-      organizations.push({
-        id: organizationId,
-        name,
-        type: typeRaw as OrganizationType,
-        website: row.website?.trim() || undefined,
-        geography: row.geography?.trim() || undefined,
-      });
-    }
-  }
-
-  // 4. Parse People
-  const people: Person[] = [];
-  for (let i = 0; i < (peopleRows?.length || 0); i++) {
-    const row = peopleRows![i];
-    const rNum = i + 2;
-
-    const personId = row.personId?.trim();
-    const firstName = row.firstName?.trim();
-    const lastName = row.lastName?.trim();
-    const fullName = row.fullName?.trim();
-    const orgsRes = parsePipeList(row.currentOrganizationIds, "currentOrganizationIds", "people.csv", rNum);
-
-    if (!personId) {
-      errors.push({ file: "people.csv", row: rNum, field: "personId", code: "MISSING_REQUIRED_FIELD", message: "personId is required." });
-    }
-    if (!firstName) {
-      errors.push({ file: "people.csv", row: rNum, field: "firstName", code: "MISSING_REQUIRED_FIELD", message: "firstName is required." });
-    }
-    if (!lastName) {
-      errors.push({ file: "people.csv", row: rNum, field: "lastName", code: "MISSING_REQUIRED_FIELD", message: "lastName is required." });
-    }
-    if (!fullName) {
-      errors.push({ file: "people.csv", row: rNum, field: "fullName", code: "MISSING_REQUIRED_FIELD", message: "fullName is required." });
-    }
-    if (orgsRes.error) {
-      errors.push(orgsRes.error);
-    }
-
-    if (personId && firstName && lastName && fullName) {
-      people.push({
-        id: personId,
-        firstName,
-        lastName,
-        fullName,
-        linkedinUrl: row.linkedinUrl?.trim() || undefined,
-        currentOrganizationIds: orgsRes.values,
-        location: row.location?.trim() || undefined,
-      });
-    }
-  }
-
-  // 5. Parse Targets
-  const targetInvestors: TargetInvestor[] = [];
-  for (let i = 0; i < (targetRows?.length || 0); i++) {
-    const row = targetRows![i];
-    const rNum = i + 2;
-
-    const targetInvestorId = row.targetInvestorId?.trim();
-    const campaignId = row.campaignId?.trim();
-    const investorOrganizationId = row.investorOrganizationId?.trim();
-    const statusRaw = row.status?.trim();
-    const candidateRes = parsePipeList(row.candidatePersonIds, "candidatePersonIds", "targets.csv", rNum);
-
-    if (!targetInvestorId) {
-      errors.push({ file: "targets.csv", row: rNum, field: "targetInvestorId", code: "MISSING_REQUIRED_FIELD", message: "targetInvestorId is required." });
-    }
-    if (!campaignId) {
-      errors.push({ file: "targets.csv", row: rNum, field: "campaignId", code: "MISSING_REQUIRED_FIELD", message: "campaignId is required." });
-    }
-    if (!investorOrganizationId) {
-      errors.push({ file: "targets.csv", row: rNum, field: "investorOrganizationId", code: "MISSING_REQUIRED_FIELD", message: "investorOrganizationId is required." });
-    }
-    if (statusRaw && !VALID_TARGET_INVESTOR_STATUSES.includes(statusRaw as TargetInvestorStatus)) {
-      errors.push({ file: "targets.csv", row: rNum, field: "status", code: "INVALID_ENUM", message: `Invalid target investor status "${statusRaw}".` });
-    }
-    if (candidateRes.error) {
-      errors.push(candidateRes.error);
-    }
-
-    if (targetInvestorId && campaignId && investorOrganizationId) {
-      targetInvestors.push({
-        id: targetInvestorId,
-        campaignId,
-        investorOrganizationId,
-        candidatePersonIds: candidateRes.values,
-        status: (statusRaw as TargetInvestorStatus) || "ready",
-      });
-    }
-  }
-
-  // 6. Parse Relationships
-  const relationships: Relationship[] = [];
-  for (let i = 0; i < (relRows?.length || 0); i++) {
-    const row = relRows![i];
-    const rNum = i + 2;
-
-    const relationshipId = row.relationshipId?.trim();
-    const fromType = row.fromType?.trim();
-    const fromId = row.fromId?.trim();
-    const toType = row.toType?.trim();
-    const toId = row.toId?.trim();
-    const typeRaw = row.type?.trim();
-    const dirRaw = row.direction?.trim();
-
-    const evRes = parsePipeList(row.evidenceIds, "evidenceIds", "relationships.csv", rNum);
-    const startRes = validateDateField(row.startedAt, "startedAt", "relationships.csv", rNum);
-    const endRes = validateDateField(row.endedAt, "endedAt", "relationships.csv", rNum);
-    const obsRes = validateDateField(row.lastObservedAt, "lastObservedAt", "relationships.csv", rNum);
-
-    if (!relationshipId) errors.push({ file: "relationships.csv", row: rNum, field: "relationshipId", code: "MISSING_REQUIRED_FIELD", message: "relationshipId is required." });
-    if (fromType !== "person" && fromType !== "organization") errors.push({ file: "relationships.csv", row: rNum, field: "fromType", code: "INVALID_ENUM", message: `Invalid fromType "${fromType}". Must be person or organization.` });
-    if (!fromId) errors.push({ file: "relationships.csv", row: rNum, field: "fromId", code: "MISSING_REQUIRED_FIELD", message: "fromId is required." });
-    if (toType !== "person" && toType !== "organization") errors.push({ file: "relationships.csv", row: rNum, field: "toType", code: "INVALID_ENUM", message: `Invalid toType "${toType}". Must be person or organization.` });
-    if (!toId) errors.push({ file: "relationships.csv", row: rNum, field: "toId", code: "MISSING_REQUIRED_FIELD", message: "toId is required." });
-
-    if (!typeRaw || !VALID_RELATIONSHIP_TYPES.includes(typeRaw as RelationshipType)) {
-      errors.push({ file: "relationships.csv", row: rNum, field: "type", code: "INVALID_ENUM", message: `Invalid relationship type "${typeRaw}".` });
-    }
-    if (!dirRaw || !VALID_RELATIONSHIP_DIRECTIONS.includes(dirRaw as RelationshipDirection)) {
-      errors.push({ file: "relationships.csv", row: rNum, field: "direction", code: "INVALID_ENUM", message: `Invalid relationship direction "${dirRaw}".` });
-    }
-
-    if (evRes.error) errors.push(evRes.error);
-    if (startRes.error) errors.push(startRes.error);
-    if (endRes.error) errors.push(endRes.error);
-    if (obsRes.error) errors.push(obsRes.error);
-
-    if (
-      relationshipId &&
-      (fromType === "person" || fromType === "organization") &&
-      fromId &&
-      (toType === "person" || toType === "organization") &&
-      toId &&
-      typeRaw &&
-      VALID_RELATIONSHIP_TYPES.includes(typeRaw as RelationshipType) &&
-      dirRaw &&
-      VALID_RELATIONSHIP_DIRECTIONS.includes(dirRaw as RelationshipDirection)
-    ) {
-      relationships.push({
-        id: relationshipId,
-        from: { type: fromType, id: fromId },
-        to: { type: toType, id: toId },
-        type: typeRaw as RelationshipType,
-        direction: dirRaw as RelationshipDirection,
-        evidenceIds: evRes.values,
-        startedAt: startRes.value,
-        endedAt: endRes.value,
-        lastObservedAt: obsRes.value,
-      });
-    }
-  }
-
-  // 7. Parse Evidence
-  const relationshipEvidence: RelationshipEvidence[] = [];
-  for (let i = 0; i < (evidenceRows?.length || 0); i++) {
-    const row = evidenceRows![i];
-    const rNum = i + 2;
-
-    const evidenceId = row.evidenceId?.trim();
-    const relationshipId = row.relationshipId?.trim();
-    const typeRaw = row.type?.trim();
-    const description = row.description?.trim();
-    const obsRes = validateDateField(row.observedAt, "observedAt", "evidence.csv", rNum, true);
-
-    if (!evidenceId) errors.push({ file: "evidence.csv", row: rNum, field: "evidenceId", code: "MISSING_REQUIRED_FIELD", message: "evidenceId is required." });
-    if (!relationshipId) errors.push({ file: "evidence.csv", row: rNum, field: "relationshipId", code: "MISSING_REQUIRED_FIELD", message: "relationshipId is required." });
-    if (!typeRaw || !VALID_EVIDENCE_TYPES.includes(typeRaw as RelationshipEvidenceType)) {
-      errors.push({ file: "evidence.csv", row: rNum, field: "type", code: "INVALID_ENUM", message: `Invalid evidence type "${typeRaw}".` });
-    }
-    if (!description) errors.push({ file: "evidence.csv", row: rNum, field: "description", code: "MISSING_REQUIRED_FIELD", message: "description is required." });
-    if (obsRes.error) errors.push(obsRes.error);
-
-    // Interaction metadata check
-    const occRaw = row.interactionOccurredAt?.trim();
-    const recipRaw = row.interactionReciprocity?.trim();
-    const statRaw = row.interactionStatus?.trim();
-
-    let interactionObj:
-      | { occurredAt: string; reciprocity: InteractionReciprocity; status: InteractionStatus }
-      | undefined = undefined;
-
-    const hasAnyInteraction = Boolean(occRaw || recipRaw || statRaw);
-    if (hasAnyInteraction) {
-      const occRes = validateDateField(occRaw, "interactionOccurredAt", "evidence.csv", rNum, true);
-      if (occRes.error) errors.push(occRes.error);
-
-      if (!recipRaw || !VALID_RECIPROCITIES.includes(recipRaw as InteractionReciprocity)) {
-        errors.push({
-          file: "evidence.csv",
-          row: rNum,
-          field: "interactionReciprocity",
-          code: "INVALID_INTERACTION_METADATA",
-          message: `Invalid interactionReciprocity "${recipRaw}". Must be one of: two_way, one_way, unknown.`,
-        });
-      }
-      if (!statRaw || !VALID_INTERACTION_STATUSES.includes(statRaw as InteractionStatus)) {
-        errors.push({
-          file: "evidence.csv",
-          row: rNum,
-          field: "interactionStatus",
-          code: "INVALID_INTERACTION_METADATA",
-          message: `Invalid interactionStatus "${statRaw}". Must be one of: confirmed, unconfirmed.`,
-        });
-      }
-
-      if (
-        occRes.value &&
-        recipRaw &&
-        VALID_RECIPROCITIES.includes(recipRaw as InteractionReciprocity) &&
-        statRaw &&
-        VALID_INTERACTION_STATUSES.includes(statRaw as InteractionStatus)
-      ) {
-        interactionObj = {
-          occurredAt: occRes.value,
-          reciprocity: recipRaw as InteractionReciprocity,
-          status: statRaw as InteractionStatus,
+    for (const reqHeader of expectedHeaders) {
+      if (!actualHeaders.includes(reqHeader)) {
+        return {
+          records: [],
+          headerError: {
+            file: fileName,
+            code: "MISSING_REQUIRED_HEADER",
+            field: reqHeader,
+            message: `Missing required CSV header "${reqHeader}" in "${fileName}".`,
+          },
         };
       }
     }
 
-    if (
-      evidenceId &&
-      relationshipId &&
-      typeRaw &&
-      VALID_EVIDENCE_TYPES.includes(typeRaw as RelationshipEvidenceType) &&
-      description &&
-      obsRes.value
-    ) {
-      relationshipEvidence.push({
-        id: evidenceId,
-        relationshipId,
-        type: typeRaw as RelationshipEvidenceType,
-        description,
-        observedAt: obsRes.value,
-        sourceName: row.sourceName?.trim() || undefined,
-        sourceUrl: row.sourceUrl?.trim() || undefined,
-        interaction: interactionObj,
+    try {
+      const records = parse(fileContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
+      return { records: records as Record<string, string>[] };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push({
+        file: fileName,
+        code: "CSV_PARSE_ERROR",
+        message: `Failed to parse CSV file "${fileName}": ${message}`,
+      });
+      return { records: [] };
+    }
+  }
+
+  // Load records from all files
+  const startupRes = readCsvRecords("startup.csv");
+  if (startupRes.headerError) errors.push(startupRes.headerError);
+
+  const campaignRes = readCsvRecords("campaign.csv");
+  if (campaignRes.headerError) errors.push(campaignRes.headerError);
+
+  const orgRes = readCsvRecords("organizations.csv");
+  if (orgRes.headerError) errors.push(orgRes.headerError);
+
+  const peopleRes = readCsvRecords("people.csv");
+  if (peopleRes.headerError) errors.push(peopleRes.headerError);
+
+  const targetRes = readCsvRecords("targets.csv");
+  if (targetRes.headerError) errors.push(targetRes.headerError);
+
+  const relRes = readCsvRecords("relationships.csv");
+  if (relRes.headerError) errors.push(relRes.headerError);
+
+  const evRes = readCsvRecords("evidence.csv");
+  if (evRes.headerError) errors.push(evRes.headerError);
+
+  const profileRes = readCsvRecords("target-person-profiles.csv");
+  if (profileRes.headerError) errors.push(profileRes.headerError);
+
+  if (errors.length > 0) {
+    return { status: "error", errors, warnings };
+  }
+
+  // Unique ID sets for duplicate entity detection
+  const seenEntityIds = new Set<string>();
+  const checkDuplicateId = (id: string, file: string, row: number): boolean => {
+    if (seenEntityIds.has(id)) {
+      errors.push({
+        file,
+        row,
+        field: "id",
+        code: "DUPLICATE_ENTITY_ID",
+        message: `Duplicate entity ID detected: "${id}" in "${file}".`,
+      });
+      return true;
+    }
+    seenEntityIds.add(id);
+    return false;
+  };
+
+  // 2. Parse Startup
+  const startups: Startup[] = [];
+  let rowIdx = 2;
+  for (const raw of startupRes.records) {
+    const idRes = parseRequiredString(raw.startupId, "startupId", "startup.csv", rowIdx);
+    const nameRes = parseRequiredString(raw.name, "name", "startup.csv", rowIdx);
+    const websiteRes = parseRequiredString(raw.website, "website", "startup.csv", rowIdx);
+    const geographyRes = parseRequiredString(raw.geography, "geography", "startup.csv", rowIdx);
+    const sectorRes = parseRequiredString(raw.sector, "sector", "startup.csv", rowIdx);
+    const stageRes = parseRequiredString(raw.stage, "stage", "startup.csv", rowIdx);
+
+    if (!idRes.value || !nameRes.value || !websiteRes.value || !geographyRes.value || !sectorRes.value || !stageRes.value) {
+      if (idRes.error) errors.push(idRes.error);
+      if (nameRes.error) errors.push(nameRes.error);
+      if (websiteRes.error) errors.push(websiteRes.error);
+      if (geographyRes.error) errors.push(geographyRes.error);
+      if (sectorRes.error) errors.push(sectorRes.error);
+      if (stageRes.error) errors.push(stageRes.error);
+    } else {
+      checkDuplicateId(idRes.value, "startup.csv", rowIdx);
+      startups.push({
+        id: idRes.value,
+        name: nameRes.value,
+        website: websiteRes.value,
+        geography: geographyRes.value,
+        sector: sectorRes.value,
+        stage: stageRes.value,
+      });
+    }
+    rowIdx++;
+  }
+
+  // Requirement 9: Exactly 1 Startup
+  if (startups.length !== 1 && errors.length === 0) {
+    errors.push({
+      file: "startup.csv",
+      code: "INVALID_STARTUP_COUNT",
+      message: `Expected exactly 1 Startup record, found ${startups.length}.`,
+    });
+  }
+
+  // 3. Parse Campaign
+  const campaigns: FundraisingCampaign[] = [];
+  rowIdx = 2;
+  for (const raw of campaignRes.records) {
+    const idRes = parseRequiredString(raw.campaignId, "campaignId", "campaign.csv", rowIdx);
+    const startupIdRes = parseRequiredString(raw.startupId, "startupId", "campaign.csv", rowIdx);
+    const roundRes = parseRequiredString(raw.round, "round", "campaign.csv", rowIdx);
+    const statusRes = parseRequiredString(raw.status, "status", "campaign.csv", rowIdx);
+    const createdAtRes = parseValidDate(raw.createdAt, "createdAt", "campaign.csv", rowIdx, true);
+
+    if (!idRes.value || !startupIdRes.value || !roundRes.value || !statusRes.value || !createdAtRes.value) {
+      if (idRes.error) errors.push(idRes.error);
+      if (startupIdRes.error) errors.push(startupIdRes.error);
+      if (roundRes.error) errors.push(roundRes.error);
+      if (statusRes.error) errors.push(statusRes.error);
+      if (createdAtRes.error) errors.push(createdAtRes.error);
+    } else {
+      if (!VALID_CAMPAIGN_STATUSES.includes(statusRes.value as CampaignStatus)) {
+        errors.push({
+          file: "campaign.csv",
+          row: rowIdx,
+          field: "status",
+          code: "INVALID_ENUM",
+          message: `Invalid campaign status "${statusRes.value}".`,
+        });
+      }
+
+      checkDuplicateId(idRes.value, "campaign.csv", rowIdx);
+
+      campaigns.push({
+        id: idRes.value,
+        startupId: startupIdRes.value,
+        round: roundRes.value,
+        status: statusRes.value as CampaignStatus,
+        createdAt: createdAtRes.value,
+        founderPersonIds: [], // Will be populated via derivation
+      });
+    }
+    rowIdx++;
+  }
+
+  // Requirement 9: Exactly 1 Campaign
+  if (campaigns.length !== 1 && errors.length === 0) {
+    errors.push({
+      file: "campaign.csv",
+      code: "INVALID_CAMPAIGN_COUNT",
+      message: `Expected exactly 1 FundraisingCampaign record, found ${campaigns.length}.`,
+    });
+  }
+
+  if (startups.length === 1 && campaigns.length === 1) {
+    if (campaigns[0].startupId !== startups[0].id) {
+      errors.push({
+        file: "campaign.csv",
+        code: "CAMPAIGN_STARTUP_MISMATCH",
+        message: `Campaign startupId "${campaigns[0].startupId}" does not match startup id "${startups[0].id}".`,
       });
     }
   }
 
-  // 8. Parse Target Person Profiles
-  const targetPersonProfiles: TargetPersonProfile[] = [];
-  for (let i = 0; i < (profileRows?.length || 0); i++) {
-    const row = profileRows![i];
-    const rNum = i + 2;
+  // 4. Parse Organizations
+  const organizations: Organization[] = [];
+  rowIdx = 2;
+  for (const raw of orgRes.records) {
+    const idRes = parseRequiredString(raw.organizationId, "organizationId", "organizations.csv", rowIdx);
+    const nameRes = parseRequiredString(raw.name, "name", "organizations.csv", rowIdx);
+    const typeRes = parseRequiredString(raw.type, "type", "organizations.csv", rowIdx);
+    const website = parseOptionalString(raw.website);
+    const geography = parseOptionalString(raw.geography);
 
-    const targetInvestorId = row.targetInvestorId?.trim();
-    const personId = row.personId?.trim();
-    const roleRaw = row.investmentRole?.trim();
-    const obsRes = validateDateField(row.observedAt, "observedAt", "target-person-profiles.csv", rNum, true);
+    if (!idRes.value || !nameRes.value || !typeRes.value) {
+      if (idRes.error) errors.push(idRes.error);
+      if (nameRes.error) errors.push(nameRes.error);
+      if (typeRes.error) errors.push(typeRes.error);
+    } else {
+      if (!VALID_ORGANIZATION_TYPES.includes(typeRes.value as OrganizationType)) {
+        errors.push({
+          file: "organizations.csv",
+          row: rowIdx,
+          field: "type",
+          code: "INVALID_ENUM",
+          message: `Invalid organization type "${typeRes.value}".`,
+        });
+      }
 
-    const stgRes = parsePipeList(row.stageFocus, "stageFocus", "target-person-profiles.csv", rNum);
-    const secRes = parsePipeList(row.sectorFocus, "sectorFocus", "target-person-profiles.csv", rNum);
-    const geoRes = parsePipeList(row.geographyFocus, "geographyFocus", "target-person-profiles.csv", rNum);
+      checkDuplicateId(idRes.value, "organizations.csv", rowIdx);
 
-    if (!targetInvestorId) errors.push({ file: "target-person-profiles.csv", row: rNum, field: "targetInvestorId", code: "MISSING_REQUIRED_FIELD", message: "targetInvestorId is required." });
-    if (!personId) errors.push({ file: "target-person-profiles.csv", row: rNum, field: "personId", code: "MISSING_REQUIRED_FIELD", message: "personId is required." });
-    if (!roleRaw || !VALID_INVESTMENT_ROLES.includes(roleRaw as TargetPersonInvestmentRole)) {
-      errors.push({ file: "target-person-profiles.csv", row: rNum, field: "investmentRole", code: "INVALID_ENUM", message: `Invalid investmentRole "${roleRaw}".` });
-    }
-    if (obsRes.error) errors.push(obsRes.error);
-    if (stgRes.error) errors.push(stgRes.error);
-    if (secRes.error) errors.push(secRes.error);
-    if (geoRes.error) errors.push(geoRes.error);
-
-    if (
-      targetInvestorId &&
-      personId &&
-      roleRaw &&
-      VALID_INVESTMENT_ROLES.includes(roleRaw as TargetPersonInvestmentRole) &&
-      obsRes.value
-    ) {
-      targetPersonProfiles.push({
-        targetInvestorId,
-        personId,
-        roleTitle: row.roleTitle?.trim() || "",
-        investmentRole: roleRaw as TargetPersonInvestmentRole,
-        stageFocus: stgRes.values,
-        sectorFocus: secRes.values,
-        geographyFocus: geoRes.values,
-        observedAt: obsRes.value,
-        sourceName: row.sourceName?.trim() || undefined,
-        sourceUrl: row.sourceUrl?.trim() || undefined,
+      organizations.push({
+        id: idRes.value,
+        name: nameRes.value,
+        type: typeRes.value as OrganizationType,
+        website,
+        geography,
       });
     }
+    rowIdx++;
   }
 
-  // Populate campaign.founderPersonIds from founder_of relationships
-  if (errors.length === 0) {
-    for (const campaign of campaigns) {
-      const startup = startups.find((s) => s.id === campaign.startupId);
-      const matchingOrgIds = new Set<string>([campaign.startupId]);
-      if (startup) {
-        for (const org of organizations) {
-          if (org.name.toLowerCase() === startup.name.toLowerCase()) {
-            matchingOrgIds.add(org.id);
-          }
+  // 5. Parse People
+  const people: Person[] = [];
+  rowIdx = 2;
+  for (const raw of peopleRes.records) {
+    const idRes = parseRequiredString(raw.personId, "personId", "people.csv", rowIdx);
+    const firstNameRes = parseRequiredString(raw.firstName, "firstName", "people.csv", rowIdx);
+    const lastNameRes = parseRequiredString(raw.lastName, "lastName", "people.csv", rowIdx);
+    const fullNameRes = parseRequiredString(raw.fullName, "fullName", "people.csv", rowIdx);
+    const linkedinUrl = parseOptionalString(raw.linkedinUrl);
+    const location = parseOptionalString(raw.location);
+
+    const currentOrgsPipe = parsePipeList(
+      raw.currentOrganizationIds,
+      "currentOrganizationIds",
+      "people.csv",
+      rowIdx
+    );
+    if (currentOrgsPipe.error) errors.push(currentOrgsPipe.error);
+
+    if (!idRes.value || !firstNameRes.value || !lastNameRes.value || !fullNameRes.value) {
+      if (idRes.error) errors.push(idRes.error);
+      if (firstNameRes.error) errors.push(firstNameRes.error);
+      if (lastNameRes.error) errors.push(lastNameRes.error);
+      if (fullNameRes.error) errors.push(fullNameRes.error);
+    } else {
+      checkDuplicateId(idRes.value, "people.csv", rowIdx);
+
+      people.push({
+        id: idRes.value,
+        firstName: firstNameRes.value,
+        lastName: lastNameRes.value,
+        fullName: fullNameRes.value,
+        linkedinUrl,
+        currentOrganizationIds: currentOrgsPipe.values,
+        location,
+      });
+    }
+    rowIdx++;
+  }
+
+  // 6. Parse Target Investors
+  const targetInvestors: TargetInvestor[] = [];
+  rowIdx = 2;
+  for (const raw of targetRes.records) {
+    const idRes = parseRequiredString(raw.targetInvestorId, "targetInvestorId", "targets.csv", rowIdx);
+    const campaignIdRes = parseRequiredString(raw.campaignId, "campaignId", "targets.csv", rowIdx);
+    const investorOrgIdRes = parseRequiredString(raw.investorOrganizationId, "investorOrganizationId", "targets.csv", rowIdx);
+    const statusRes = parseRequiredString(raw.status, "status", "targets.csv", rowIdx);
+
+    const candidatePipe = parsePipeList(
+      raw.candidatePersonIds,
+      "candidatePersonIds",
+      "targets.csv",
+      rowIdx
+    );
+    if (candidatePipe.error) errors.push(candidatePipe.error);
+
+    if (candidatePipe.values.length === 0 && !candidatePipe.error) {
+      errors.push({
+        file: "targets.csv",
+        row: rowIdx,
+        field: "candidatePersonIds",
+        code: "MISSING_TARGET_CANDIDATES",
+        message: `Target investor "${idRes.value || raw.targetInvestorId}" must have at least 1 candidate person ID.`,
+      });
+    }
+
+    if (!idRes.value || !campaignIdRes.value || !investorOrgIdRes.value || !statusRes.value) {
+      if (idRes.error) errors.push(idRes.error);
+      if (campaignIdRes.error) errors.push(campaignIdRes.error);
+      if (investorOrgIdRes.error) errors.push(investorOrgIdRes.error);
+      if (statusRes.error) errors.push(statusRes.error);
+    } else {
+      if (!VALID_TARGET_INVESTOR_STATUSES.includes(statusRes.value as TargetInvestorStatus)) {
+        errors.push({
+          file: "targets.csv",
+          row: rowIdx,
+          field: "status",
+          code: "INVALID_ENUM",
+          message: `Invalid target investor status "${statusRes.value}".`,
+        });
+      }
+
+      if (campaigns.length === 1 && campaignIdRes.value !== campaigns[0].id) {
+        errors.push({
+          file: "targets.csv",
+          row: rowIdx,
+          field: "campaignId",
+          code: "TARGET_CAMPAIGN_MISMATCH",
+          message: `Target investor "${idRes.value}" references campaignId "${campaignIdRes.value}" which does not match campaign "${campaigns[0].id}".`,
+        });
+      }
+
+      checkDuplicateId(idRes.value, "targets.csv", rowIdx);
+
+      targetInvestors.push({
+        id: idRes.value,
+        campaignId: campaignIdRes.value,
+        investorOrganizationId: investorOrgIdRes.value,
+        candidatePersonIds: candidatePipe.values,
+        status: statusRes.value as TargetInvestorStatus,
+      });
+    }
+    rowIdx++;
+  }
+
+  // 7. Parse Relationships
+  const relationships: Relationship[] = [];
+  rowIdx = 2;
+  for (const raw of relRes.records) {
+    const idRes = parseRequiredString(raw.relationshipId, "relationshipId", "relationships.csv", rowIdx);
+    const fromTypeRes = parseRequiredString(raw.fromType, "fromType", "relationships.csv", rowIdx);
+    const fromIdRes = parseRequiredString(raw.fromId, "fromId", "relationships.csv", rowIdx);
+    const toTypeRes = parseRequiredString(raw.toType, "toType", "relationships.csv", rowIdx);
+    const toIdRes = parseRequiredString(raw.toId, "toId", "relationships.csv", rowIdx);
+    const typeRes = parseRequiredString(raw.type, "type", "relationships.csv", rowIdx);
+    const directionRes = parseRequiredString(raw.direction, "direction", "relationships.csv", rowIdx);
+    const startedAtRes = parseValidDate(raw.startedAt, "startedAt", "relationships.csv", rowIdx, true);
+    const endedAtRes = parseValidDate(raw.endedAt, "endedAt", "relationships.csv", rowIdx, false);
+    const lastObservedAtRes = parseValidDate(raw.lastObservedAt, "lastObservedAt", "relationships.csv", rowIdx, true);
+
+    const evidencePipe = parsePipeList(
+      raw.evidenceIds,
+      "evidenceIds",
+      "relationships.csv",
+      rowIdx
+    );
+    if (evidencePipe.error) errors.push(evidencePipe.error);
+
+    if (
+      !idRes.value ||
+      !fromTypeRes.value ||
+      !fromIdRes.value ||
+      !toTypeRes.value ||
+      !toIdRes.value ||
+      !typeRes.value ||
+      !directionRes.value ||
+      !startedAtRes.value ||
+      !lastObservedAtRes.value
+    ) {
+      if (idRes.error) errors.push(idRes.error);
+      if (fromTypeRes.error) errors.push(fromTypeRes.error);
+      if (fromIdRes.error) errors.push(fromIdRes.error);
+      if (toTypeRes.error) errors.push(toTypeRes.error);
+      if (toIdRes.error) errors.push(toIdRes.error);
+      if (typeRes.error) errors.push(typeRes.error);
+      if (directionRes.error) errors.push(directionRes.error);
+      if (startedAtRes.error) errors.push(startedAtRes.error);
+      if (lastObservedAtRes.error) errors.push(lastObservedAtRes.error);
+    } else {
+      if (!VALID_RELATIONSHIP_TYPES.includes(typeRes.value as RelationshipType)) {
+        errors.push({
+          file: "relationships.csv",
+          row: rowIdx,
+          field: "type",
+          code: "INVALID_ENUM",
+          message: `Invalid relationship type "${typeRes.value}".`,
+        });
+      }
+      if (!VALID_RELATIONSHIP_DIRECTIONS.includes(directionRes.value as RelationshipDirection)) {
+        errors.push({
+          file: "relationships.csv",
+          row: rowIdx,
+          field: "direction",
+          code: "INVALID_ENUM",
+          message: `Invalid relationship direction "${directionRes.value}".`,
+        });
+      }
+
+      checkDuplicateId(idRes.value, "relationships.csv", rowIdx);
+
+      relationships.push({
+        id: idRes.value,
+        from: {
+          type: fromTypeRes.value as "person" | "organization",
+          id: fromIdRes.value,
+        },
+        to: {
+          type: toTypeRes.value as "person" | "organization",
+          id: toIdRes.value,
+        },
+        type: typeRes.value as RelationshipType,
+        direction: directionRes.value as RelationshipDirection,
+        evidenceIds: evidencePipe.values,
+        startedAt: startedAtRes.value,
+        endedAt: endedAtRes.value,
+        lastObservedAt: lastObservedAtRes.value,
+      });
+    }
+    rowIdx++;
+  }
+
+  // 8. Parse Relationship Evidence
+  const relationshipEvidence: RelationshipEvidence[] = [];
+  rowIdx = 2;
+  for (const raw of evRes.records) {
+    const idRes = parseRequiredString(raw.evidenceId, "evidenceId", "evidence.csv", rowIdx);
+    const relIdRes = parseRequiredString(raw.relationshipId, "relationshipId", "evidence.csv", rowIdx);
+    const typeRes = parseRequiredString(raw.type, "type", "evidence.csv", rowIdx);
+    const descRes = parseRequiredString(raw.description, "description", "evidence.csv", rowIdx);
+    const observedAtRes = parseValidDate(raw.observedAt, "observedAt", "evidence.csv", rowIdx, true);
+    const sourceNameRes = parseRequiredString(raw.sourceName, "sourceName", "evidence.csv", rowIdx);
+    const sourceUrl = parseOptionalString(raw.sourceUrl);
+
+    // Interaction metadata check (Requirement 17)
+    const interactionOccurredAtStr = parseOptionalString(raw.interactionOccurredAt);
+    const interactionReciprocityStr = parseOptionalString(raw.interactionReciprocity);
+    const interactionStatusStr = parseOptionalString(raw.interactionStatus);
+
+    const hasAnyInteractionField =
+      !!interactionOccurredAtStr || !!interactionReciprocityStr || !!interactionStatusStr;
+
+    let interactionMetadata: RelationshipEvidence["interaction"] = undefined;
+
+    if (hasAnyInteractionField) {
+      if (!interactionOccurredAtStr || !interactionReciprocityStr || !interactionStatusStr) {
+        errors.push({
+          file: "evidence.csv",
+          row: rowIdx,
+          code: "PARTIAL_INTERACTION_METADATA",
+          message: "When any interaction field is populated, interactionOccurredAt, interactionReciprocity, and interactionStatus are all required.",
+        });
+      } else {
+        const occurredAtDate = new Date(interactionOccurredAtStr);
+        if (isNaN(occurredAtDate.getTime())) {
+          errors.push({
+            file: "evidence.csv",
+            row: rowIdx,
+            field: "interactionOccurredAt",
+            code: "INVALID_DATE",
+            message: `Invalid interactionOccurredAt date "${interactionOccurredAtStr}".`,
+          });
         }
+        if (!VALID_RECIPROCITIES.includes(interactionReciprocityStr as InteractionReciprocity)) {
+          errors.push({
+            file: "evidence.csv",
+            row: rowIdx,
+            field: "interactionReciprocity",
+            code: "INVALID_ENUM",
+            message: `Invalid interactionReciprocity "${interactionReciprocityStr}".`,
+          });
+        }
+        if (!VALID_INTERACTION_STATUSES.includes(interactionStatusStr as InteractionStatus)) {
+          errors.push({
+            file: "evidence.csv",
+            row: rowIdx,
+            field: "interactionStatus",
+            code: "INVALID_ENUM",
+            message: `Invalid interactionStatus "${interactionStatusStr}".`,
+          });
+        }
+
+        interactionMetadata = {
+          occurredAt: interactionOccurredAtStr,
+          reciprocity: interactionReciprocityStr as InteractionReciprocity,
+          status: interactionStatusStr as InteractionStatus,
+        };
+      }
+    }
+
+    if (!idRes.value || !relIdRes.value || !typeRes.value || !descRes.value || !observedAtRes.value || !sourceNameRes.value) {
+      if (idRes.error) errors.push(idRes.error);
+      if (relIdRes.error) errors.push(relIdRes.error);
+      if (typeRes.error) errors.push(typeRes.error);
+      if (descRes.error) errors.push(descRes.error);
+      if (observedAtRes.error) errors.push(observedAtRes.error);
+      if (sourceNameRes.error) errors.push(sourceNameRes.error);
+    } else {
+      if (!VALID_EVIDENCE_TYPES.includes(typeRes.value as RelationshipEvidenceType)) {
+        errors.push({
+          file: "evidence.csv",
+          row: rowIdx,
+          field: "type",
+          code: "INVALID_ENUM",
+          message: `Invalid evidence type "${typeRes.value}".`,
+        });
       }
 
-      const startupRels = relationships.filter(
-        (r) =>
-          r.type === "founder_of" &&
-          ((r.to.type === "organization" && matchingOrgIds.has(r.to.id)) ||
-            (r.from.type === "organization" && matchingOrgIds.has(r.from.id)))
-      );
-      const founderIds = new Set<string>();
-      for (const rel of startupRels) {
-        if (rel.from.type === "person") founderIds.add(rel.from.id);
-        if (rel.to.type === "person") founderIds.add(rel.to.id);
-      }
-      campaign.founderPersonIds = Array.from(founderIds);
+      checkDuplicateId(idRes.value, "evidence.csv", rowIdx);
+
+      relationshipEvidence.push({
+        id: idRes.value,
+        relationshipId: relIdRes.value,
+        type: typeRes.value as RelationshipEvidenceType,
+        description: descRes.value,
+        observedAt: observedAtRes.value,
+        sourceName: sourceNameRes.value,
+        sourceUrl,
+        interaction: interactionMetadata,
+      });
     }
+    rowIdx++;
+  }
+
+  // 9. Parse Target Person Profiles
+  const targetPersonProfiles: TargetPersonProfile[] = [];
+  const seenProfileKeys = new Set<string>();
+  rowIdx = 2;
+  for (const raw of profileRes.records) {
+    const targetInvestorIdRes = parseRequiredString(
+      raw.targetInvestorId,
+      "targetInvestorId",
+      "target-person-profiles.csv",
+      rowIdx
+    );
+    const personIdRes = parseRequiredString(
+      raw.personId,
+      "personId",
+      "target-person-profiles.csv",
+      rowIdx
+    );
+    const roleTitleRes = parseRequiredString(
+      raw.roleTitle,
+      "roleTitle",
+      "target-person-profiles.csv",
+      rowIdx
+    );
+    const investmentRoleRes = parseRequiredString(
+      raw.investmentRole,
+      "investmentRole",
+      "target-person-profiles.csv",
+      rowIdx
+    );
+    const observedAtRes = parseValidDate(
+      raw.observedAt,
+      "observedAt",
+      "target-person-profiles.csv",
+      rowIdx,
+      true
+    );
+    const sourceName = parseOptionalString(raw.sourceName);
+    const sourceUrl = parseOptionalString(raw.sourceUrl);
+
+    const stageFocusPipe = parsePipeList(
+      raw.stageFocus,
+      "stageFocus",
+      "target-person-profiles.csv",
+      rowIdx
+    );
+    if (stageFocusPipe.error) errors.push(stageFocusPipe.error);
+
+    const sectorFocusPipe = parsePipeList(
+      raw.sectorFocus,
+      "sectorFocus",
+      "target-person-profiles.csv",
+      rowIdx
+    );
+    if (sectorFocusPipe.error) errors.push(sectorFocusPipe.error);
+
+    const geographyFocusPipe = parsePipeList(
+      raw.geographyFocus,
+      "geographyFocus",
+      "target-person-profiles.csv",
+      rowIdx
+    );
+    if (geographyFocusPipe.error) errors.push(geographyFocusPipe.error);
+
+    if (
+      !targetInvestorIdRes.value ||
+      !personIdRes.value ||
+      !roleTitleRes.value ||
+      !investmentRoleRes.value ||
+      !observedAtRes.value
+    ) {
+      if (targetInvestorIdRes.error) errors.push(targetInvestorIdRes.error);
+      if (personIdRes.error) errors.push(personIdRes.error);
+      if (roleTitleRes.error) errors.push(roleTitleRes.error);
+      if (investmentRoleRes.error) errors.push(investmentRoleRes.error);
+      if (observedAtRes.error) errors.push(observedAtRes.error);
+    } else {
+      if (!VALID_INVESTMENT_ROLES.includes(investmentRoleRes.value as TargetPersonInvestmentRole)) {
+        errors.push({
+          file: "target-person-profiles.csv",
+          row: rowIdx,
+          field: "investmentRole",
+          code: "INVALID_ENUM",
+          message: `Invalid investment role "${investmentRoleRes.value}".`,
+        });
+      }
+
+      const compositeKey = `${targetInvestorIdRes.value}|${personIdRes.value}`;
+      if (seenProfileKeys.has(compositeKey)) {
+        errors.push({
+          file: "target-person-profiles.csv",
+          row: rowIdx,
+          code: "DUPLICATE_PROFILE",
+          message: `Duplicate profile detected for targetInvestorId "${targetInvestorIdRes.value}" and personId "${personIdRes.value}".`,
+        });
+      }
+      seenProfileKeys.add(compositeKey);
+
+      targetPersonProfiles.push({
+        targetInvestorId: targetInvestorIdRes.value,
+        personId: personIdRes.value,
+        roleTitle: roleTitleRes.value,
+        investmentRole: investmentRoleRes.value as TargetPersonInvestmentRole,
+        stageFocus: stageFocusPipe.values,
+        sectorFocus: sectorFocusPipe.values,
+        geographyFocus: geographyFocusPipe.values,
+        observedAt: observedAtRes.value,
+        sourceName,
+        sourceUrl,
+      });
+    }
+    rowIdx++;
   }
 
   if (errors.length > 0) {
     return { status: "error", errors, warnings };
   }
 
+  // 10. Startup Organization Resolution & Founder Derivation (Requirements 10 & 11)
+  const singleStartup = startups[0];
+  const matchingOrgs = organizations.filter(
+    (org) =>
+      org.type === "startup" &&
+      (org.id === singleStartup.id ||
+        org.name.trim().toLowerCase() === singleStartup.name.trim().toLowerCase())
+  );
+
+  if (matchingOrgs.length === 0) {
+    errors.push({
+      file: "organizations.csv",
+      code: "STARTUP_ORGANIZATION_NOT_FOUND",
+      message: `No startup Organization found matching startup "${singleStartup.name}" (${singleStartup.id}).`,
+    });
+  } else if (matchingOrgs.length > 1) {
+    errors.push({
+      file: "organizations.csv",
+      code: "AMBIGUOUS_STARTUP_ORGANIZATION",
+      message: `Multiple startup Organizations found matching startup "${singleStartup.name}" (${singleStartup.id}).`,
+    });
+  }
+
+  if (errors.length > 0) {
+    return { status: "error", errors, warnings };
+  }
+
+  const resolvedStartupOrg = matchingOrgs[0];
+
+  // Derive campaign.founderPersonIds
+  const singleCampaign = campaigns[0];
+  const founderRels = relationships.filter(
+    (r) =>
+      r.type === "founder_of" &&
+      ((r.to.type === "organization" && r.to.id === resolvedStartupOrg.id) ||
+        (r.from.type === "organization" && r.from.id === resolvedStartupOrg.id))
+  );
+
+  const founderIdsSet = new Set<string>();
+  for (const rel of founderRels) {
+    if (rel.from.type === "person") founderIdsSet.add(rel.from.id);
+    if (rel.to.type === "person") founderIdsSet.add(rel.to.id);
+  }
+
+  singleCampaign.founderPersonIds = Array.from(founderIdsSet);
+
+  if (singleCampaign.founderPersonIds.length === 0) {
+    errors.push({
+      file: "relationships.csv",
+      code: "NO_CAMPAIGN_FOUNDERS",
+      message: "Fundraising campaign has 0 derived founder person IDs.",
+    });
+    return { status: "error", errors, warnings };
+  }
+
+  // 11. Construct PathwayDataset and validate integrity
   const dataset: PathwayDataset = {
     startups,
+    campaigns,
     organizations,
     people,
+    targetInvestors,
     relationships,
     relationshipEvidence,
-    campaigns,
-    targetInvestors,
   };
 
-  // Run Dataset Integrity Validation
-  const integrity = assertDatasetIntegrity(dataset);
-  if (!integrity.valid) {
-    for (const err of integrity.errors) {
+  const integrityResult = assertDatasetIntegrity(dataset);
+  if (integrityResult.errors.length > 0) {
+    for (const errMessage of integrityResult.errors) {
       errors.push({
         file: "dataset",
         code: "DATASET_INTEGRITY_ERROR",
-        message: err,
+        message: errMessage,
       });
     }
     return { status: "error", errors, warnings };

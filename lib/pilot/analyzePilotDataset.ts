@@ -8,6 +8,13 @@ import { applyPathRejection } from "@/lib/pathway/applyPathRejection";
 import { scoreRetainedPaths } from "@/lib/pathway/scoreRetainedPaths";
 import { selectTargetPerson } from "@/lib/pathway/selectTargetPerson";
 
+export type PilotAnalysisStatus = "success" | "error";
+
+export interface PilotAnalysisError {
+  code: string;
+  message: string;
+}
+
 export interface PilotScoredPathSummary {
   pathId: string;
   targetPersonId: string;
@@ -27,30 +34,48 @@ export interface PilotTargetReport {
   investorOrganizationName: string;
   generation: {
     executionStatus: string;
-    disposition: string;
+    disposition: string | null;
     pathCount: number;
     eligiblePathCount: number;
     confirmationRequiredPathCount: number;
+    errors: unknown[];
   };
   rejection: {
-    disposition: string;
+    executionStatus: string;
+    disposition: string | null;
     retainedPathCount: number;
     rejectedPathCount: number;
     rejectionReasons: string[];
+    errors: unknown[];
   };
   scoring: {
-    disposition: string;
+    executionStatus: string;
+    disposition: string | null;
     scoredPathCount: number;
     scoredPaths: PilotScoredPathSummary[];
+    errors: unknown[];
   };
   selection: {
-    disposition: string;
+    executionStatus: string;
+    disposition: string | null;
     primaryTargetPersonId?: string;
     primaryTargetPersonName?: string;
     topCandidatePersonIds: string[];
     evaluations: TargetPersonEvaluation[];
+    errors: unknown[];
   };
   diagnosticFlags: string[];
+}
+
+export interface PilotAnalysisSummary {
+  targetsAnalyzed: number;
+  targetsWithRetainedPaths: number;
+  targetsWithOnlyRejectedPaths: number;
+  targetsWithNoKnownPaths: number;
+  targetsWithAnalysisErrors: number;
+  targetsWithPrimaryPersonSelected: number;
+  targetsWithAmbiguousPeople: number;
+  targetsWithIncompleteContext: number;
 }
 
 export interface PilotAnalysisReport {
@@ -64,25 +89,97 @@ export interface PilotAnalysisReport {
     relationshipCount: number;
     evidenceCount: number;
   };
-  summary: {
-    targetsAnalyzed: number;
-    targetsWithRetainedPaths: number;
-    targetsWithOnlyRejectedPaths: number;
-    targetsWithNoKnownPaths: number;
-    targetsWithPrimaryPersonSelected: number;
-    targetsWithAmbiguousPeople: number;
-    targetsWithIncompleteContext: number;
-  };
+  summary: PilotAnalysisSummary;
   targetReports: PilotTargetReport[];
+}
+
+export interface PilotAnalysisResult {
+  status: PilotAnalysisStatus;
+  report?: PilotAnalysisReport;
+  errors?: PilotAnalysisError[];
 }
 
 export function analyzePilotDataset(
   dataset: PathwayDataset,
   targetPersonProfiles: TargetPersonProfile[],
   referenceDate: string
-): PilotAnalysisReport {
+): PilotAnalysisResult {
+  // 1. Validate referenceDate
+  if (
+    !referenceDate ||
+    typeof referenceDate !== "string" ||
+    referenceDate.trim() === ""
+  ) {
+    return {
+      status: "error",
+      errors: [
+        {
+          code: "INVALID_REFERENCE_DATE",
+          message: "Reference date must be a non-empty string.",
+        },
+      ],
+    };
+  }
+
+  const parsedRefDate = new Date(referenceDate);
+  if (isNaN(parsedRefDate.getTime())) {
+    return {
+      status: "error",
+      errors: [
+        {
+          code: "INVALID_REFERENCE_DATE",
+          message: `Invalid reference date provided: "${referenceDate}".`,
+        },
+      ],
+    };
+  }
+
+  // 2. Validate single startup and single campaign structure
+  if (!dataset.startups || dataset.startups.length !== 1) {
+    return {
+      status: "error",
+      errors: [
+        {
+          code: "INVALID_DATASET_SHAPE",
+          message: `Expected exactly 1 Startup in dataset, found ${
+            dataset.startups ? dataset.startups.length : 0
+          }.`,
+        },
+      ],
+    };
+  }
+
+  if (!dataset.campaigns || dataset.campaigns.length !== 1) {
+    return {
+      status: "error",
+      errors: [
+        {
+          code: "INVALID_DATASET_SHAPE",
+          message: `Expected exactly 1 FundraisingCampaign in dataset, found ${
+            dataset.campaigns ? dataset.campaigns.length : 0
+          }.`,
+        },
+      ],
+    };
+  }
+
   const startup = dataset.startups[0];
   const campaign = dataset.campaigns[0];
+
+  // 3. Validate every TargetInvestor references the single campaign
+  for (const t of dataset.targetInvestors) {
+    if (t.campaignId !== campaign.id) {
+      return {
+        status: "error",
+        errors: [
+          {
+            code: "TARGET_CAMPAIGN_MISMATCH",
+            message: `Target investor "${t.id}" references campaignId "${t.campaignId}" which does not match campaign "${campaign.id}".`,
+          },
+        ],
+      };
+    }
+  }
 
   const uniqueCandidatePersonIds = new Set<string>();
   for (const t of dataset.targetInvestors) {
@@ -96,6 +193,7 @@ export function analyzePilotDataset(
   let targetsWithRetainedPaths = 0;
   let targetsWithOnlyRejectedPaths = 0;
   let targetsWithNoKnownPaths = 0;
+  let targetsWithAnalysisErrors = 0;
   let targetsWithPrimaryPersonSelected = 0;
   let targetsWithAmbiguousPeople = 0;
   let targetsWithIncompleteContext = 0;
@@ -106,20 +204,17 @@ export function analyzePilotDataset(
     );
     const orgName = org ? org.name : targetInvestor.investorOrganizationId;
 
-    // 1. Path Generation
+    // Execute frozen pipeline stages
     const genResult = generatePathsForTarget(
       dataset,
       targetInvestor.id,
       referenceDate
     );
 
-    // 2. Path Rejection
     const rejResult = applyPathRejection(genResult);
 
-    // 3. Path Scoring
     const scoreResult = scoreRetainedPaths(rejResult);
 
-    // 4. Target Person Selection
     const selectResult = selectTargetPerson(
       dataset,
       targetInvestor.id,
@@ -128,22 +223,58 @@ export function analyzePilotDataset(
       referenceDate
     );
 
-    // Diagnostic Flags calculation
+    // Analysis error check
+    const isAnalysisError =
+      genResult.executionStatus !== "success" ||
+      rejResult.executionStatus !== "success" ||
+      scoreResult.executionStatus !== "success" ||
+      selectResult.executionStatus !== "success";
+
     const flags: string[] = [];
 
-    const generatedPathCount = genResult.paths.length;
-    const retainedPathCount = rejResult.retainedPaths.length;
+    if (isAnalysisError) {
+      flags.push("ANALYSIS_ERROR");
+      targetsWithAnalysisErrors++;
+    }
 
-    if (genResult.disposition === "no_known_path" || generatedPathCount === 0) {
+    const generatedPathCount = genResult.paths ? genResult.paths.length : 0;
+    const retainedPathCount = rejResult.retainedPaths
+      ? rejResult.retainedPaths.length
+      : 0;
+
+    // Requirement 2: NO_KNOWN_PATH emit rules
+    if (
+      genResult.executionStatus === "success" &&
+      genResult.disposition === "no_known_path" &&
+      generatedPathCount === 0 &&
+      !isAnalysisError
+    ) {
       flags.push("NO_KNOWN_PATH");
       targetsWithNoKnownPaths++;
-    } else if (generatedPathCount > 0 && retainedPathCount === 0) {
+    }
+
+    if (
+      !isAnalysisError &&
+      genResult.executionStatus === "success" &&
+      generatedPathCount > 0 &&
+      rejResult.executionStatus === "success" &&
+      retainedPathCount === 0
+    ) {
       flags.push("ALL_PATHS_REJECTED");
       targetsWithOnlyRejectedPaths++;
     }
 
-    if (retainedPathCount > 0) {
+    if (!isAnalysisError && retainedPathCount > 0) {
       targetsWithRetainedPaths++;
+    }
+
+    // Requirement 6: UPSTREAM_FILTERING_DIAGNOSTIC
+    if (
+      genResult.disposition === "confirmation_paths_filtered" ||
+      rejResult.disposition === "all_paths_rejected" ||
+      scoreResult.disposition === "upstream_paths_filtered"
+    ) {
+      flags.push("PATHS_FILTERED_UPSTREAM");
     }
 
     if (genResult.confirmationRequiredPathCount > 0) {
@@ -204,21 +335,19 @@ export function analyzePilotDataset(
       }
     }
 
-    if (!startup || !startup.stage) {
-      if (!campaign || !campaign.round) {
-        if (!flags.includes("MISSING_STARTUP_STAGE")) {
-          flags.push("MISSING_STARTUP_STAGE");
-        }
-        hasIncompleteContext = true;
+    if (!startup.stage) {
+      if (!flags.includes("MISSING_STARTUP_STAGE")) {
+        flags.push("MISSING_STARTUP_STAGE");
       }
+      hasIncompleteContext = true;
     }
-    if (!startup || !startup.sector) {
+    if (!startup.sector) {
       if (!flags.includes("MISSING_STARTUP_SECTOR")) {
         flags.push("MISSING_STARTUP_SECTOR");
       }
       hasIncompleteContext = true;
     }
-    if (!startup || !startup.geography) {
+    if (!startup.geography) {
       if (!flags.includes("MISSING_STARTUP_GEOGRAPHY")) {
         flags.push("MISSING_STARTUP_GEOGRAPHY");
       }
@@ -233,23 +362,23 @@ export function analyzePilotDataset(
     }
 
     // Map scored paths
-    const scoredPathSummaries: PilotScoredPathSummary[] = scoreResult.scoredPaths.map(
-      (sp) => ({
-        pathId: sp.path.id,
-        targetPersonId: sp.path.targetPersonId,
-        overallPriorityIndex: sp.score.overallPriorityIndex,
-        componentScores: {
-          relationshipCredibility: sp.score.relationshipCredibility,
-          temporalFreshness: sp.score.temporalFreshness,
-          confirmationReadiness: sp.score.confirmationReadiness,
-          pathEfficiency: sp.score.pathEfficiency,
-        },
-        explanation: sp.score.explanation,
-      })
-    );
+    const scoredPathSummaries: PilotScoredPathSummary[] = (
+      scoreResult.scoredPaths || []
+    ).map((sp) => ({
+      pathId: sp.path.id,
+      targetPersonId: sp.path.targetPersonId,
+      overallPriorityIndex: sp.score.overallPriorityIndex,
+      componentScores: {
+        relationshipCredibility: sp.score.relationshipCredibility,
+        temporalFreshness: sp.score.temporalFreshness,
+        confirmationReadiness: sp.score.confirmationReadiness,
+        pathEfficiency: sp.score.pathEfficiency,
+      },
+      explanation: sp.score.explanation,
+    }));
 
     // Map rejection reasons
-    const rejectionReasons = rejResult.evaluations
+    const rejectionReasons = (rejResult.evaluations || [])
       .filter((ev) => ev.decision === "reject")
       .map((ev) => `${ev.pathId}: ${ev.explanation || "REJECTED"}`);
 
@@ -259,39 +388,46 @@ export function analyzePilotDataset(
       investorOrganizationName: orgName,
       generation: {
         executionStatus: genResult.executionStatus,
-        disposition: genResult.disposition || "unknown",
+        disposition: genResult.disposition,
         pathCount: generatedPathCount,
-        eligiblePathCount: genResult.eligiblePathCount,
-        confirmationRequiredPathCount: genResult.confirmationRequiredPathCount,
+        eligiblePathCount: genResult.eligiblePathCount || 0,
+        confirmationRequiredPathCount: genResult.confirmationRequiredPathCount || 0,
+        errors: genResult.errors || [],
       },
       rejection: {
+        executionStatus: rejResult.executionStatus,
         disposition: rejResult.disposition,
         retainedPathCount,
-        rejectedPathCount: rejResult.rejectedPaths.length,
+        rejectedPathCount: rejResult.rejectedPaths ? rejResult.rejectedPaths.length : 0,
         rejectionReasons,
+        errors: rejResult.errors || [],
       },
       scoring: {
+        executionStatus: scoreResult.executionStatus,
         disposition: scoreResult.disposition,
-        scoredPathCount: scoreResult.scoredPaths.length,
+        scoredPathCount: scoredPathSummaries.length,
         scoredPaths: scoredPathSummaries,
+        errors: scoreResult.errors || [],
       },
       selection: {
+        executionStatus: selectResult.executionStatus,
         disposition: selectResult.disposition,
         primaryTargetPersonId: selectResult.primaryTargetPersonId,
         primaryTargetPersonName: primaryPersonName,
-        topCandidatePersonIds: selectResult.topCandidatePersonIds,
-        evaluations: selectResult.evaluations,
+        topCandidatePersonIds: selectResult.topCandidatePersonIds || [],
+        evaluations: selectResult.evaluations || [],
+        errors: selectResult.errors || [],
       },
       diagnosticFlags: flags,
     });
   }
 
-  return {
+  const report: PilotAnalysisReport = {
     meta: {
       referenceDate,
-      startupId: startup ? startup.id : "unknown",
-      startupName: startup ? startup.name : "unknown",
-      campaignId: campaign ? campaign.id : "unknown",
+      startupId: startup.id,
+      startupName: startup.name,
+      campaignId: campaign.id,
       targetInvestorCount: dataset.targetInvestors.length,
       candidatePersonCount: uniqueCandidatePersonIds.size,
       relationshipCount: dataset.relationships.length,
@@ -302,10 +438,16 @@ export function analyzePilotDataset(
       targetsWithRetainedPaths,
       targetsWithOnlyRejectedPaths,
       targetsWithNoKnownPaths,
+      targetsWithAnalysisErrors,
       targetsWithPrimaryPersonSelected,
       targetsWithAmbiguousPeople,
       targetsWithIncompleteContext,
     },
     targetReports,
+  };
+
+  return {
+    status: "success",
+    report,
   };
 }

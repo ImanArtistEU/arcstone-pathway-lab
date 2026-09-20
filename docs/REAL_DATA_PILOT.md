@@ -14,6 +14,10 @@ The **Real-Data Pilot Harness** enables founders and investment teams to run Arc
 > **FROZEN DECISION PIPELINE**
 > The pilot harness is a diagnostic wrapper *outside* the core decision pipeline. It does **NOT** tune scoring weights, adjust selection heuristics, add web scraping, or alter qualification rules. It exists to evaluate current model behavior against empirical reality.
 
+> [!NOTE]
+> **SINGLE-STARTUP / SINGLE-CAMPAIGN CONTRACT (v1)**
+> Each pilot CSV bundle represents **EXACTLY 1 STARTUP** and **EXACTLY 1 FUNDRAISING CAMPAIGN**. The campaign's founders are derived dynamically from active `founder_of` relationships pointing to the resolved startup organization.
+
 ---
 
 ## 1. Quick Start Guide for Founders
@@ -29,8 +33,8 @@ cp data/templates/real-pilot/*.csv private-data/my-startup-pilot/
 ### Step 2: Populate CSV Files
 Open the CSV files in your spreadsheet editor (e.g., Google Sheets, Excel, Numbers) or text editor and populate your campaign data:
 
-1. `startup.csv` — Startup entity details (name, stage, sector, geography).
-2. `campaign.csv` — Fundraising campaign details (round, status, creation date).
+1. `startup.csv` — Single startup details (name, stage, sector, geography).
+2. `campaign.csv` — Single fundraising campaign details (round, status, creation date).
 3. `organizations.csv` — Companies, VC funds, corporate entities, advisory firms in your network.
 4. `people.csv` — Founders, advisors, VC partners, colleagues, intermediaries.
 5. `targets.csv` — Target investor organizations and candidate contacts at each firm.
@@ -62,17 +66,17 @@ The harness generates two diagnostic files under `pilot-output/<bundle-name>/`:
 
 After completing a pilot run, evaluate your results using these 11 strategic review questions:
 
-1. **Import Cleanliness:** Did the harness successfully ingest your network export without parse errors or formatting rejections?
-2. **Data Completeness:** Were any relationships or evidence items unexpectedly dropped during validation?
-3. **Route Reality:** Did the generated routes match your intuitive understanding of your warm intro network?
-4. **Rejection Quality:** Did path rejection remove any pathways you considered valid, or retain any you considered invalid?
-5. **Score Alignment:** Were the relative priority index scores aligned with your actual relationship trust levels?
-6. **Mandate Accuracy:** Did target person selection identify the right investor at each firm based on investment focus?
-7. **Access vs Mandate:** How often did the model select a candidate with no known warm path over an easy-to-reach contact with zero mandate fit?
-8. **Selection Ambiguity:** Were any target investors flagged as ambiguous due to tied priority index scores?
-9. **Context Impact:** Did incomplete startup or investor profile context affect the mandate fit evaluation?
-10. **Diagnostic Distribution:** Which diagnostic flags (`NO_KNOWN_PATH`, `ALL_PATHS_REJECTED`, `CONFIRMATION_REQUIRED`, etc.) occurred most frequently across your target investor list?
-11. **Data Quality Gaps:** What data quality gaps (missing dates, vague evidence descriptions, missing focus tags) were revealed by the pilot run?
+1. **Target Person Selection:** Did Arcstone pick the right target person at this fund?
+2. **Selection Root Cause:** If not, why? (wrong sector focus, wrong stage focus, wrong role title, missing target profile)
+3. **Pathway Quality:** Did Arcstone find the best introduction pathway?
+4. **Missing Warm Paths:** Did Arcstone miss a warm path that the founder actually has?
+5. **Invalid Warm Paths:** Did Arcstone output a warm path that is actually dead, invalid, or inappropriate?
+6. **No Known Path Accuracy:** Did the system classify a path as "No Known Path" when a real path exists?
+7. **Analysis Error Decoupling:** Did the system classify an analysis error as "No Known Path"? (Analysis errors MUST emit `ANALYSIS_ERROR`, never `NO_KNOWN_PATH`).
+8. **Confirmation Visibility:** Were confirmation-required paths highlighted properly in the report?
+9. **Mandate vs Access Dominance:** Is the primary person selected truly the best contact based on mandate fit, or just the easiest person to reach?
+10. **Context Completeness:** Is any required startup or investor context missing from the CSV bundle?
+11. **Loader & Integrity Stability:** Did any dataset loading error or integrity error prevent analysis?
 
 ---
 
@@ -82,7 +86,7 @@ After completing a pilot run, evaluate your results using these 11 strategic rev
 CSV Bundle (8 CSVs)
    │
    ▼
-loadPilotCsvBundle() ──► Dataset Integrity Check
+loadPilotCsvBundle() ──► Single Startup & Campaign Integrity Check
    │
    ▼
 analyzePilotDataset()
