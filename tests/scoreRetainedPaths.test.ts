@@ -25,20 +25,20 @@ describe("Deterministic Path Scoring / Priority Index (Batch 5)", () => {
     expect(res.scoredPaths.length).toBe(1);
   });
 
-  it("2: Horizon overallPriorityIndex = 98", () => {
+  it("2: Horizon overallPriorityIndex = 60", () => {
     const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
     const rej = applyPathRejection(gen);
     const res = scoreRetainedPaths(rej);
 
-    expect(res.scoredPaths[0].score.overallPriorityIndex).toBe(98);
+    expect(res.scoredPaths[0].score.overallPriorityIndex).toBe(60);
   });
 
-  it("3: Horizon relationshipCredibility = 100", () => {
+  it("3: Horizon relationshipCredibility = 35", () => {
     const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
     const rej = applyPathRejection(gen);
     const res = scoreRetainedPaths(rej);
 
-    expect(res.scoredPaths[0].score.relationshipCredibility).toBe(100);
+    expect(res.scoredPaths[0].score.relationshipCredibility).toBe(35);
   });
 
   it("4: Horizon temporalFreshness = 100", () => {
@@ -49,12 +49,12 @@ describe("Deterministic Path Scoring / Priority Index (Batch 5)", () => {
     expect(res.scoredPaths[0].score.temporalFreshness).toBe(100);
   });
 
-  it("5: Horizon confirmationReadiness = 100", () => {
+  it("5: Horizon confirmationReadiness = 55", () => {
     const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
     const rej = applyPathRejection(gen);
     const res = scoreRetainedPaths(rej);
 
-    expect(res.scoredPaths[0].score.confirmationReadiness).toBe(100);
+    expect(res.scoredPaths[0].score.confirmationReadiness).toBe(55);
   });
 
   it("6: Horizon pathEfficiency = 80", () => {
@@ -316,12 +316,12 @@ describe("Deterministic Path Scoring / Priority Index (Batch 5)", () => {
   });
 
   // Confirmation Readiness Tests (25 - 28)
-  it("25: Zero confirmation hops -> 100", () => {
+  it("25: One confirmation hop -> 55", () => {
     const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
     const rej = applyPathRejection(gen);
     const res = scoreRetainedPaths(rej);
 
-    expect(res.scoredPaths[0].score.confirmationReadiness).toBe(100);
+    expect(res.scoredPaths[0].score.confirmationReadiness).toBe(55);
   });
 
   it("26: One confirmation hop -> 55", () => {
@@ -821,13 +821,13 @@ describe("Deterministic Path Scoring / Priority Index (Batch 5)", () => {
     expect(exp).toContain("This is an uncalibrated heuristic, not a success probability.");
   });
 
-  it("70: Horizon explanation contains direct recent evidence description and uncalibrated warning", () => {
+  it("70: Horizon explanation contains confirmation requirement description and uncalibrated warning", () => {
     const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
     const rej = applyPathRejection(gen);
     const res = scoreRetainedPaths(rej);
 
     const exp = res.scoredPaths[0].score.explanation;
-    expect(exp).toContain("Recent confirmed direct interaction");
+    expect(exp).toContain("requiring confirmation");
     expect(exp).toContain("This is an uncalibrated heuristic, not a success probability.");
   });
 

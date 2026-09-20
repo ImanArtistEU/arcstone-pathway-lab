@@ -34,8 +34,8 @@ describe("Batch 6 — Deterministic Target Person Selection Engine", () => {
     expect(res.disposition).toBe("primary_target_selected");
     expect(res.primaryTargetPersonId).toBe("person-vc-sarah");
     expect(res.topCandidatePersonIds).toEqual(["person-vc-sarah"]);
-    expect(res.evaluations[0].accessQualityIndex).toBe(98);
-    expect(res.evaluations[0].overallTargetPriorityIndex).toBe(99); // round(100*0.7 + 98*0.3) = round(70 + 29.4) = 99
+    expect(res.evaluations[0].accessQualityIndex).toBe(60);
+    expect(res.evaluations[0].overallTargetPriorityIndex).toBe(88); // round(100*0.7 + 60*0.3) = round(70 + 18) = 88
   });
 
   it("2: Selects David Miller as primary target for Beacon Capital with 52 access quality", () => {
@@ -246,7 +246,7 @@ describe("Batch 6 — Deterministic Target Person Selection Engine", () => {
     const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
     const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
     const res = selectTargetPerson(pathwayDemoDataset, "target-horizon", profs, scoreRes, REFERENCE_DATE);
-    expect(res.evaluations[0].overallTargetPriorityIndex).toBe(67);
+    expect(res.evaluations[0].overallTargetPriorityIndex).toBe(56);
   });
 
   it("16: Default 70/30 mandate dominance policy allows Candidate A with perfect mandate & 0 access to beat Candidate B with weak mandate & 98 access", () => {

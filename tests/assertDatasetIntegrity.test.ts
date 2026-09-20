@@ -300,11 +300,24 @@ describe("Dataset Integrity Validator", () => {
     ).toBe(true);
   });
 
+  it("D: fails when duplicate IDs are present", () => {
+    const brokenDataset: PathwayDataset = {
+      ...pathwayDemoDataset,
+      people: [
+        ...pathwayDemoDataset.people,
+        pathwayDemoDataset.people[0],
+      ],
+    };
+
+    const result = assertDatasetIntegrity(brokenDataset);
+    expect(result.valid).toBe(false);
+  });
+
   it("M: passes validation on valid confirmed two-way email interaction", () => {
     const validDataset: PathwayDataset = {
       ...pathwayDemoDataset,
       relationshipEvidence: pathwayDemoDataset.relationshipEvidence.map((ev) =>
-        ev.id === "ev-marcus-sarah-email"
+        ev.id === "ev-elena-marcus-email"
           ? {
               ...ev,
               interaction: {

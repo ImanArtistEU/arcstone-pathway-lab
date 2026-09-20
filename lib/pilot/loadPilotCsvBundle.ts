@@ -20,6 +20,8 @@ import {
   CampaignStatus,
   TargetInvestorStatus,
   TargetPersonInvestmentRole,
+  EvidenceAccessClass,
+  EvidenceSourceSystem,
 } from "@/types/pathway";
 import { assertDatasetIntegrity } from "@/lib/pathway/assertDatasetIntegrity";
 
@@ -850,6 +852,35 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
       }
     }
 
+    // Provenance fields
+    let accessClass = parseOptionalString(raw.accessClass) as EvidenceAccessClass | undefined;
+    let sourceSystem = parseOptionalString(raw.sourceSystem) as EvidenceSourceSystem | undefined;
+    const sourcePrincipalPersonId = parseOptionalString(raw.sourcePrincipalPersonId);
+    const authorizedByPersonId = parseOptionalString(raw.authorizedByPersonId);
+
+    // Fallback defaults for backwards compatibility
+    if (!accessClass) {
+      if (typeRes.value === "email_history" || typeRes.value === "meeting_history" || typeRes.value === "crm_history") {
+        accessClass = "first_party_private";
+      } else if (typeRes.value === "user_reported") {
+        accessClass = "user_asserted";
+      } else {
+        accessClass = "public";
+      }
+    }
+
+    if (!sourceSystem) {
+      if (typeRes.value === "email_history") sourceSystem = "gmail";
+      else if (typeRes.value === "meeting_history") sourceSystem = "google_calendar";
+      else if (typeRes.value === "crm_history") sourceSystem = "crm";
+      else if (typeRes.value === "linkedin") sourceSystem = "linkedin";
+      else if (typeRes.value === "company_website") sourceSystem = "company_website";
+      else if (typeRes.value === "portfolio_page") sourceSystem = "portfolio_page";
+      else if (typeRes.value === "press_release" || typeRes.value === "news_article") sourceSystem = "press";
+      else if (typeRes.value === "user_reported" || typeRes.value === "manual_research") sourceSystem = "manual";
+      else sourceSystem = "other";
+    }
+
     if (!idRes.value || !relIdRes.value || !typeRes.value || !descRes.value || observedAtRes.error) {
       if (idRes.error) errors.push(idRes.error);
       if (relIdRes.error) errors.push(relIdRes.error);
@@ -874,6 +905,12 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
         relationshipId: relIdRes.value,
         type: typeRes.value as RelationshipEvidenceType,
         description: descRes.value,
+        provenance: {
+          accessClass,
+          sourceSystem,
+          sourcePrincipalPersonId,
+          authorizedByPersonId,
+        },
         observedAt: observedAtRes.value,
         sourceName,
         sourceUrl,

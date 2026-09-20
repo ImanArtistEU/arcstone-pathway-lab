@@ -212,7 +212,7 @@ describe("loadPilotCsvBundle", () => {
   it("18. returns error for duplicate evidence ID", () => {
     const evPath = path.join(tempDir, "evidence.csv");
     let content = fs.readFileSync(evPath, "utf8");
-    content += "\nev-founder-nexus-web,rel-elena-nexus,company_website,Duplicate,2026-09-01T00:00:00.000Z,Web,https://site.com,,,\n";
+    content += "\nev-founder-nexus-web,rel-elena-nexus,company_website,Duplicate,2026-09-01T00:00:00.000Z,Web,https://site.com,,,,public,company_website,,\n";
     fs.writeFileSync(evPath, content, "utf8");
 
     const result = loadPilotCsvBundle(tempDir);
@@ -422,7 +422,7 @@ describe("loadPilotCsvBundle", () => {
 
     const evPath = path.join(tempDir, "evidence.csv");
     let evContent = fs.readFileSync(evPath, "utf8");
-    evContent += "\nev-other-founder-web,rel-other-founder,company_website,Historical founder,2022-01-01T00:00:00.000Z,Web,https://nexus.com,,,\n";
+    evContent += "\nev-other-founder-web,rel-other-founder,company_website,Historical founder,2022-01-01T00:00:00.000Z,Web,https://nexus.com,,,,public,company_website,,\n";
     fs.writeFileSync(evPath, evContent, "utf8");
 
     const result = loadPilotCsvBundle(tempDir);
@@ -438,7 +438,7 @@ describe("loadPilotCsvBundle", () => {
 
     const evPath = path.join(tempDir, "evidence.csv");
     let evContent = fs.readFileSync(evPath, "utf8");
-    evContent += "\nev-reversed-founder-web,rel-reversed-founder,company_website,Reversed founder,2022-01-01T00:00:00.000Z,Web,https://nexus.com,,,\n";
+    evContent += "\nev-reversed-founder-web,rel-reversed-founder,company_website,Reversed founder,2022-01-01T00:00:00.000Z,Web,https://nexus.com,,,,public,company_website,,\n";
     fs.writeFileSync(evPath, evContent, "utf8");
 
     const result = loadPilotCsvBundle(tempDir);

@@ -30,20 +30,20 @@ describe("Deterministic Path Generation & Traversal Engine (Batch 3.1 Hardened)"
     ]);
   });
 
-  it("2: Horizon path is eligible and disposition is eligible_path_available", () => {
+  it("2: Horizon path is confirmation_required and disposition is confirmation_path_available", () => {
     const res = generatePathsForTarget(
       pathwayDemoDataset,
       "target-horizon",
       REFERENCE_DATE
     );
     expect(res.executionStatus).toBe("success");
-    expect(res.disposition).toBe("eligible_path_available");
+    expect(res.disposition).toBe("confirmation_path_available");
     expect(res.coldOutreachRequired).toBe(false);
-    expect(res.eligiblePathCount).toBe(1);
-    expect(res.confirmationRequiredPathCount).toBe(0);
+    expect(res.eligiblePathCount).toBe(0);
+    expect(res.confirmationRequiredPathCount).toBe(1);
     expect(res.filteredConfirmationPathCount).toBe(0);
-    expect(res.paths[0].status).toBe("eligible");
-    expect(res.paths[0].requiresConfirmationRelationshipIds).toEqual([]);
+    expect(res.paths[0].status).toBe("candidate");
+    expect(res.paths[0].requiresConfirmationRelationshipIds).toEqual(["rel-marcus-sarah"]);
   });
 
   it("3: Horizon advisor hop uses traversedReverse = true", () => {
@@ -248,6 +248,12 @@ describe("Deterministic Path Generation & Traversal Engine (Batch 3.1 Hardened)"
       relationshipId: "rel-bad-edge",
       type: "meeting_history",
       description: "Invalid interaction record",
+      provenance: {
+        accessClass: "first_party_private",
+        sourceSystem: "google_calendar",
+        sourcePrincipalPersonId: "person-founder-elena",
+        authorizedByPersonId: "person-founder-elena",
+      },
       observedAt: "2026-09-01",
       interaction: {
         occurredAt: "not-a-date",
@@ -282,8 +288,8 @@ describe("Deterministic Path Generation & Traversal Engine (Batch 3.1 Hardened)"
       { includeConfirmationRequired: false }
     );
     expect(horizonRes.executionStatus).toBe("success");
-    expect(horizonRes.paths.length).toBe(1);
-    expect(horizonRes.disposition).toBe("eligible_path_available");
+    expect(horizonRes.paths.length).toBe(0);
+    expect(horizonRes.disposition).toBe("confirmation_paths_filtered");
     expect(horizonRes.coldOutreachRequired).toBe(false);
 
     const beaconRes = generatePathsForTarget(
@@ -366,6 +372,12 @@ describe("Deterministic Path Generation & Traversal Engine (Batch 3.1 Hardened)"
       relationshipId: "rel-sarah-elena-cycle",
       type: "email_history",
       description: "Cycle test",
+      provenance: {
+        accessClass: "first_party_private",
+        sourceSystem: "gmail",
+        sourcePrincipalPersonId: "person-founder-elena",
+        authorizedByPersonId: "person-founder-elena",
+      },
       observedAt: "2026-09-01",
       interaction: {
         occurredAt: "2026-08-01",
@@ -477,6 +489,12 @@ describe("Deterministic Path Generation & Traversal Engine (Batch 3.1 Hardened)"
       relationshipId: "rel-john-marcus",
       type: "email_history",
       description: "Co-founder advisory sync",
+      provenance: {
+        accessClass: "first_party_private",
+        sourceSystem: "gmail",
+        sourcePrincipalPersonId: "person-founder-john",
+        authorizedByPersonId: "person-founder-john",
+      },
       observedAt: "2026-09-01",
       interaction: {
         occurredAt: "2026-08-15",
@@ -528,12 +546,11 @@ describe("Deterministic Path Generation & Traversal Engine (Batch 3.1 Hardened)"
       relationshipId: "rel-marcus-alex",
       type: "email_history",
       description: "Co-invested with Alex",
-      observedAt: "2026-09-01",
-      interaction: {
-        occurredAt: "2026-08-10",
-        reciprocity: "two_way",
-        status: "confirmed",
+      provenance: {
+        accessClass: "public",
+        sourceSystem: "press",
       },
+      observedAt: "2026-09-01",
     });
     multiCandidateDataset.relationships.push({
       id: "rel-alex-horizon",
@@ -548,6 +565,10 @@ describe("Deterministic Path Generation & Traversal Engine (Batch 3.1 Hardened)"
       relationshipId: "rel-alex-horizon",
       type: "company_website",
       description: "Partner at Horizon",
+      provenance: {
+        accessClass: "public",
+        sourceSystem: "company_website",
+      },
       observedAt: "2026-09-01",
     });
 

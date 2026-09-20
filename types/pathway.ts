@@ -124,11 +124,37 @@ export interface InteractionEvidenceDetails {
   status: InteractionStatus;
 }
 
+export type EvidenceAccessClass =
+  | "first_party_private"
+  | "user_asserted"
+  | "public"
+  | "consented_third_party_private";
+
+export type EvidenceSourceSystem =
+  | "gmail"
+  | "google_calendar"
+  | "crm"
+  | "manual"
+  | "linkedin"
+  | "company_website"
+  | "portfolio_page"
+  | "press"
+  | "public_web"
+  | "other";
+
+export interface EvidenceProvenance {
+  accessClass: EvidenceAccessClass;
+  sourceSystem: EvidenceSourceSystem;
+  sourcePrincipalPersonId?: string;
+  authorizedByPersonId?: string;
+}
+
 export interface RelationshipEvidence {
   id: string;
   relationshipId: string;
   type: RelationshipEvidenceType;
   description: string;
+  provenance?: EvidenceProvenance;
   /** When Arcstone observed, ingested, or recorded this evidence artifact */
   observedAt?: string;
   sourceUrl?: string;
@@ -423,7 +449,11 @@ export type QualificationReasonCode =
   | "INVALID_INTERACTION_DATE"
   | "INVALID_REFERENCE_DATE"
   | "ONE_WAY_OUTREACH_ONLY"
-  | "UNCONFIRMED_INTERACTION";
+  | "UNCONFIRMED_INTERACTION"
+  | "PUBLIC_PROXIMITY_ONLY"
+  | "USER_ASSERTED_THIRD_PARTY_RELATIONSHIP"
+  | "PRIVATE_EVIDENCE_NOT_OBSERVABLE"
+  | "THIRD_PARTY_CONFIRMATION_REQUIRED";
 
 export interface RelationshipQualification {
   relationshipId: string;
@@ -561,6 +591,11 @@ export interface RouteEvidenceItem {
   evidenceId: string;
   evidenceType: RelationshipEvidenceType;
   description: string;
+  accessClass?: EvidenceAccessClass;
+  sourceSystem?: EvidenceSourceSystem;
+  sourcePrincipalPersonId?: string;
+  authorizedByPersonId?: string;
+  originLabel?: string;
   sourceName?: string;
   sourceUrl?: string;
   observedAt?: string;
@@ -586,6 +621,11 @@ export interface RouteStepExplanation {
   evidenceItems: RouteEvidenceItem[];
   whyThisConnectionExists: string;
   confidenceLimitation?: string;
+  evidenceAccessClass?: EvidenceAccessClass;
+  evidenceSourceSystems?: EvidenceSourceSystem[];
+  observabilityExplanation?: string;
+  whatArcstoneKnows?: string[];
+  whatArcstoneDoesNotKnow?: string[];
 }
 
 export interface RouteWeakestLink {

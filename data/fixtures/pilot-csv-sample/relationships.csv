@@ -1,7 +1,7 @@
 relationshipId,fromType,fromId,toType,toId,type,direction,evidenceIds,startedAt,endedAt,lastObservedAt
 rel-elena-nexus,person,person-founder-elena,organization,org-nexus,founder_of,directed,ev-founder-nexus-web,2023-01-01,,2026-09-01
 rel-elena-marcus,person,person-advisor-marcus,person,person-founder-elena,advisor,directed,ev-elena-marcus-agreement|ev-elena-marcus-website|ev-elena-marcus-meetings,2023-01-15,,2026-09-01
-rel-marcus-sarah,person,person-advisor-marcus,person,person-vc-sarah,co_invested,bidirectional,ev-marcus-sarah-press|ev-marcus-sarah-board|ev-marcus-sarah-email,2021-06-01,,2026-08-15
+rel-marcus-sarah,person,person-advisor-marcus,person,person-vc-sarah,co_invested,bidirectional,ev-marcus-sarah-press|ev-marcus-sarah-board,2021-06-01,,2026-08-15
 rel-sarah-horizon,person,person-vc-sarah,organization,org-horizon-vc,works_at,directed,ev-sarah-horizon-website,2020-01-01,,2026-09-01
 rel-elena-david,person,person-founder-elena,person,person-vc-david,linkedin_connection,bidirectional,ev-elena-david-linkedin,2026-02-10,,2026-08-01
 rel-david-beacon,person,person-vc-david,organization,org-beacon-cap,works_at,directed,ev-david-beacon-website,2022-03-01,,2026-09-01

@@ -16,6 +16,9 @@ import {
   ActivationStep,
   ScoredPath,
   PathCandidate,
+  EvidenceAccessClass,
+  EvidenceSourceSystem,
+  QualificationReasonCode,
 } from "@/types/pathway";
 
 /**
@@ -168,12 +171,96 @@ function buildTargetPersonDecisionExplanation(
   };
 }
 
+function getOriginLabel(accessClass?: EvidenceAccessClass): string {
+  switch (accessClass) {
+    case "first_party_private":
+      return "YOUR CONNECTED DATA";
+    case "public":
+      return "PUBLIC SOURCE";
+    case "user_asserted":
+      return "YOUR ASSERTION";
+    case "consented_third_party_private":
+      return "SHARED WITH ARCSTONE";
+    default:
+      return "PUBLIC SOURCE";
+  }
+}
+
+function buildStepObservabilityAndKnowledge(
+  fromPersonName: string,
+  toPersonName: string,
+  accessClass: EvidenceAccessClass,
+  evidenceItems: RouteEvidenceItem[],
+  qualificationReasonCodes: QualificationReasonCode[],
+  isFounderEndpoint: boolean
+): {
+  observabilityExplanation: string;
+  whatArcstoneKnows: string[];
+  whatArcstoneDoesNotKnow: string[];
+} {
+  const whatArcstoneKnows: string[] = [];
+  const whatArcstoneDoesNotKnow: string[] = [];
+  let observabilityExplanation = "";
+
+  if (accessClass === "first_party_private" && isFounderEndpoint) {
+    observabilityExplanation = `Arcstone observes private communication and interaction records directly connected by an authorized campaign founder.`;
+    whatArcstoneKnows.push(
+      `Arcstone observes direct interaction records (Calendar syncs, CRM logs, Email headers) authorized by campaign founders.`
+    );
+    whatArcstoneDoesNotKnow.push(
+      `Arcstone does not observe unlogged offline conversations or third-party communications outside connected accounts.`
+    );
+  } else if (accessClass === "user_asserted") {
+    observabilityExplanation = `Arcstone records user-asserted relationship details provided directly by the founder or team.`;
+    whatArcstoneKnows.push(
+      `Arcstone records founder-asserted information regarding ${fromPersonName} and ${toPersonName}.`
+    );
+    whatArcstoneDoesNotKnow.push(
+      `Arcstone cannot independently verify third-party interaction frequency or current responsiveness without first-party system records.`
+    );
+  } else {
+    // public or unobservable private
+    observabilityExplanation = `Arcstone observes public co-investment announcements and governance board listings, but cannot observe private communications between third parties.`;
+
+    if (evidenceItems.some((i) => i.evidenceType === "press_release" || i.evidenceType === "portfolio_page" || i.evidenceType === "news_article")) {
+      whatArcstoneKnows.push(
+        `Arcstone observes public co-investment press releases and board observer listings.`
+      );
+    } else if (evidenceItems.some((i) => i.evidenceType === "company_website")) {
+      whatArcstoneKnows.push(
+        `Arcstone observes corporate website team directories and public organization affiliations.`
+      );
+    } else if (evidenceItems.some((i) => i.evidenceType === "linkedin")) {
+      whatArcstoneKnows.push(
+        `Arcstone observes public social / platform connection profiles.`
+      );
+    } else {
+      whatArcstoneKnows.push(
+        `Arcstone observes public structural context for ${fromPersonName} and ${toPersonName}.`
+      );
+    }
+
+    if (!isFounderEndpoint) {
+      whatArcstoneDoesNotKnow.push(
+        `Arcstone cannot observe private emails or meetings between third parties where no connected founder is a party.`
+      );
+    } else {
+      whatArcstoneDoesNotKnow.push(
+        `Arcstone cannot observe private message exchange or off-platform communication beyond public listings.`
+      );
+    }
+  }
+
+  return { observabilityExplanation, whatArcstoneKnows, whatArcstoneDoesNotKnow };
+}
+
 /**
  * Build step explanation for a single hop in a path
  */
 function buildRouteStepExplanation(
   dataset: PathwayDataset,
-  step: ScoredPath["path"]["steps"][number]
+  step: ScoredPath["path"]["steps"][number],
+  campaignFounderPersonIds: Set<string>
 ): RouteStepExplanation {
   const fromPersonName = getPersonName(dataset, step.fromPersonId);
   const toPersonName = getPersonName(dataset, step.toPersonId);
@@ -185,17 +272,56 @@ function buildRouteStepExplanation(
     (e) => e.relationshipId === step.relationshipId
   );
 
-  const evidenceItems: RouteEvidenceItem[] = matchingEvidences.map((e) => ({
-    evidenceId: e.id,
-    evidenceType: e.type,
-    description: e.description,
-    sourceName: e.sourceName,
-    sourceUrl: e.sourceUrl,
-    observedAt: e.observedAt,
-    interactionOccurredAt: e.interaction?.occurredAt,
-    interactionReciprocity: e.interaction?.reciprocity,
-    interactionStatus: e.interaction?.status,
-  }));
+  const isFounderEndpoint =
+    campaignFounderPersonIds.has(step.fromPersonId) ||
+    campaignFounderPersonIds.has(step.toPersonId);
+
+  const evidenceItems: RouteEvidenceItem[] = matchingEvidences.map((e) => {
+    const accessClass = e.provenance?.accessClass || "public";
+    const sourceSystem = e.provenance?.sourceSystem || "other";
+    return {
+      evidenceId: e.id,
+      evidenceType: e.type,
+      description: e.description,
+      sourceName: e.sourceName,
+      sourceUrl: e.sourceUrl,
+      observedAt: e.observedAt,
+      interactionOccurredAt: e.interaction?.occurredAt,
+      interactionReciprocity: e.interaction?.reciprocity,
+      interactionStatus: e.interaction?.status,
+      accessClass,
+      sourceSystem,
+      sourcePrincipalPersonId: e.provenance?.sourcePrincipalPersonId,
+      authorizedByPersonId: e.provenance?.authorizedByPersonId,
+      originLabel: getOriginLabel(accessClass),
+    };
+  });
+
+  // Determine step evidence access class
+  let stepAccessClass: EvidenceAccessClass = "public";
+  if (evidenceItems.some((i) => i.accessClass === "first_party_private") && isFounderEndpoint) {
+    stepAccessClass = "first_party_private";
+  } else if (evidenceItems.some((i) => i.accessClass === "consented_third_party_private")) {
+    stepAccessClass = "consented_third_party_private";
+  } else if (evidenceItems.some((i) => i.accessClass === "user_asserted")) {
+    stepAccessClass = "user_asserted";
+  } else {
+    stepAccessClass = "public";
+  }
+
+  const evidenceSourceSystems: EvidenceSourceSystem[] = Array.from(
+    new Set(evidenceItems.map((i) => i.sourceSystem || "other"))
+  );
+
+  const { observabilityExplanation, whatArcstoneKnows, whatArcstoneDoesNotKnow } =
+    buildStepObservabilityAndKnowledge(
+      fromPersonName,
+      toPersonName,
+      stepAccessClass,
+      evidenceItems,
+      step.qualificationReasonCodes,
+      isFounderEndpoint
+    );
 
   // Factual explanation of connection existence
   let whyThisConnectionExists = "";
@@ -203,14 +329,16 @@ function buildRouteStepExplanation(
     (i) => i.interactionStatus === "confirmed" && i.interactionReciprocity === "two_way"
   );
 
-  if (confirmedTwoWay) {
+  if (stepAccessClass === "first_party_private" && confirmedTwoWay) {
     const dateStr = confirmedTwoWay.interactionOccurredAt
       ? ` recorded on ${confirmedTwoWay.interactionOccurredAt}`
       : "";
     const sourceStr = confirmedTwoWay.sourceName ? ` through ${confirmedTwoWay.sourceName}` : "";
     whyThisConnectionExists = `Arcstone recognizes ${fromPersonName} → ${toPersonName} because the relationship has a confirmed two-way interaction${sourceStr}${dateStr}.`;
-  } else if (evidenceItems.some((i) => i.evidenceType === "user_reported" || i.evidenceType === "public_profile")) {
+  } else if (evidenceItems.some((i) => i.accessClass === "user_asserted")) {
     whyThisConnectionExists = `Arcstone recognizes ${fromPersonName} → ${toPersonName} based on founder-reported relationship evidence and public context. No recent confirmed interaction is recorded, so the relationship requires confirmation.`;
+  } else if (evidenceItems.some((i) => i.evidenceType === "press_release" || i.evidenceType === "portfolio_page")) {
+    whyThisConnectionExists = `Arcstone recognizes ${fromPersonName} → ${toPersonName} based on public co-investment and board observer listings. No private interaction data is observable by Arcstone.`;
   } else if (step.qualificationReasonCodes.includes("LINKEDIN_ONLY")) {
     whyThisConnectionExists = `Arcstone recognizes ${fromPersonName} → ${toPersonName} based on platform-only connection signals. No confirmed direct interaction is recorded, so the relationship requires confirmation.`;
   } else {
@@ -218,7 +346,9 @@ function buildRouteStepExplanation(
   }
 
   let confidenceLimitation: string | undefined = undefined;
-  if (step.qualificationStatus === "confirmation_required") {
+  if (step.qualificationReasonCodes.includes("PRIVATE_EVIDENCE_NOT_OBSERVABLE")) {
+    confidenceLimitation = "Arcstone cannot observe private emails or meetings between third parties.";
+  } else if (step.qualificationStatus === "confirmation_required") {
     confidenceLimitation =
       "Platform-only or unconfirmed relationship signal requiring confirmation.";
   } else if (step.qualificationRecency === "stale" || step.qualificationRecency === "aging") {
@@ -240,6 +370,11 @@ function buildRouteStepExplanation(
     latestRelevantInteractionAt: step.latestRelevantInteractionAt,
     evidenceSummary: step.qualificationEvidenceSummary,
     evidenceItems,
+    evidenceAccessClass: stepAccessClass,
+    evidenceSourceSystems,
+    observabilityExplanation,
+    whatArcstoneKnows,
+    whatArcstoneDoesNotKnow,
     whyThisConnectionExists,
     confidenceLimitation,
   };
@@ -369,6 +504,8 @@ function buildActivationPlan(
       status: "verification_required",
       firstActorPersonId: founderId,
       firstActorPersonName: founderName,
+      nextPersonId: confirmRel?.from.id,
+      nextPersonName: confirmFrom,
       targetPersonId: targetId,
       targetPersonName: targetName,
       steps: [
@@ -784,9 +921,16 @@ export function buildPathwayExplanation(
   // Exactly one top route selected
   const preferredScoredPath = topScoredPaths[0];
 
+  const campaignFounderPersonIds = new Set<string>();
+  for (const campaign of dataset.campaigns || []) {
+    for (const fId of campaign.founderPersonIds || []) {
+      campaignFounderPersonIds.add(fId);
+    }
+  }
+
   // Build steps
   const steps: RouteStepExplanation[] = preferredScoredPath.path.steps.map((st, idx) => {
-    const stepExp = buildRouteStepExplanation(dataset, st);
+    const stepExp = buildRouteStepExplanation(dataset, st, campaignFounderPersonIds);
     const stepScore = preferredScoredPath.score.stepScores[idx];
     if (stepScore) {
       stepExp.relationshipCredibility = stepScore.relationshipCredibility;

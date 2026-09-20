@@ -94,11 +94,62 @@ interface QualifyingInteraction {
  * - No mutation of inputs
  * - No probabilistic scoring or AI
  */
+/**
+ * Evaluates whether an evidence item represents an observable private interaction.
+ */
+function isEvidenceObservablePrivateInteraction(
+  ev: RelationshipEvidence,
+  relationship: Relationship,
+  campaignFounderPersonIds?: string[]
+): boolean {
+  const cat = classifyEvidenceType(ev.type);
+
+  // Public context evidence cannot establish observable direct interaction
+  if (cat === "public_context") {
+    return false;
+  }
+
+  const fromId = relationship.from.id;
+  const toId = relationship.to.id;
+
+  const accessClass = ev.provenance?.accessClass ?? "first_party_private";
+  const sourcePrincipal = ev.provenance?.sourcePrincipalPersonId;
+
+  if (accessClass === "first_party_private") {
+    if (sourcePrincipal) {
+      if (campaignFounderPersonIds && campaignFounderPersonIds.length > 0) {
+        if (!campaignFounderPersonIds.includes(sourcePrincipal)) {
+          return false;
+        }
+      }
+      return sourcePrincipal === fromId || sourcePrincipal === toId;
+    }
+    if (campaignFounderPersonIds && campaignFounderPersonIds.length > 0) {
+      const isFromFounder = campaignFounderPersonIds.includes(fromId);
+      const isToFounder = campaignFounderPersonIds.includes(toId);
+      if (!isFromFounder && !isToFounder) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  if (accessClass === "consented_third_party_private") {
+    if (sourcePrincipal) {
+      return sourcePrincipal === fromId || sourcePrincipal === toId;
+    }
+    return true;
+  }
+
+  return false;
+}
+
 export function qualifyRelationship(
   relationship: Relationship,
   evidenceList: RelationshipEvidence[],
   referenceDate: string | Date,
-  policy: QualificationPolicy = DEFAULT_QUALIFICATION_POLICY
+  policy: QualificationPolicy = DEFAULT_QUALIFICATION_POLICY,
+  campaignFounderPersonIds?: string[]
 ): RelationshipQualification {
   const relationshipClass = classifyRelationshipType(relationship.type);
 
@@ -114,20 +165,52 @@ export function qualifyRelationship(
     unconfirmedInteraction: 0,
   };
 
+  let hasUnobservablePrivateEvidence = false;
+  let hasUserAssertedThirdParty = false;
+  let hasPublicEvidence = false;
+
   for (const ev of evidenceList) {
     const category = classifyEvidenceType(ev.type);
+    const accessClass = ev.provenance?.accessClass;
+
+    if (accessClass === "public") {
+      hasPublicEvidence = true;
+    }
+
     if (category === "direct_interaction") evidenceSummary.directInteraction++;
     else if (category === "founder_asserted") evidenceSummary.founderAsserted++;
     else if (category === "public_context") evidenceSummary.publicContext++;
     else if (category === "platform_signal") evidenceSummary.platformSignal++;
 
+    const isObservable = isEvidenceObservablePrivateInteraction(
+      ev,
+      relationship,
+      campaignFounderPersonIds
+    );
+
+    if (
+      (accessClass === "first_party_private" || accessClass === "consented_third_party_private" || category === "direct_interaction") &&
+      !isObservable
+    ) {
+      hasUnobservablePrivateEvidence = true;
+    }
+
+    if (accessClass === "user_asserted") {
+      const isEndpoint =
+        ev.provenance?.sourcePrincipalPersonId === relationship.from.id ||
+        ev.provenance?.sourcePrincipalPersonId === relationship.to.id;
+      if (!isEndpoint) {
+        hasUserAssertedThirdParty = true;
+      }
+    }
+
     if (ev.interaction) {
       if (ev.interaction.status === "unconfirmed") {
         evidenceSummary.unconfirmedInteraction++;
       } else if (ev.interaction.status === "confirmed") {
-        if (ev.interaction.reciprocity === "two_way") {
+        if (ev.interaction.reciprocity === "two_way" && isObservable) {
           evidenceSummary.confirmedTwoWayInteraction++;
-        } else if (ev.interaction.reciprocity === "one_way") {
+        } else if (ev.interaction.reciprocity === "one_way" && isObservable) {
           evidenceSummary.oneWayInteraction++;
         }
       }
@@ -135,7 +218,6 @@ export function qualifyRelationship(
   }
 
   // 2. RULE A: STRUCTURAL EDGE
-  // Structural relationships establish organizational or role facts independent of temporal interaction recency
   if (relationshipClass === "structural") {
     return {
       relationshipId: relationship.id,
@@ -187,7 +269,7 @@ export function qualifyRelationship(
     };
   }
 
-  // 5. TEMPORAL INTEGRITY CHECKS ON EVIDENCE (Invalid or Future Dates)
+  // 5. TEMPORAL INTEGRITY CHECKS ON EVIDENCE
   for (const ev of evidenceList) {
     if (ev.interaction?.occurredAt) {
       const intMs = parseDateMs(ev.interaction.occurredAt);
@@ -285,8 +367,15 @@ export function qualifyRelationship(
   const qualifyingInteractions: QualifyingInteraction[] = [];
   for (const ev of evidenceList) {
     const cat = classifyEvidenceType(ev.type);
+    const isObservable = isEvidenceObservablePrivateInteraction(
+      ev,
+      relationship,
+      campaignFounderPersonIds
+    );
+
     if (
       (cat === "direct_interaction" || cat === "founder_asserted") &&
+      isObservable &&
       ev.interaction &&
       ev.interaction.status === "confirmed" &&
       ev.interaction.reciprocity === "two_way" &&
@@ -321,29 +410,74 @@ export function qualifyRelationship(
   const winningInteraction = qualifyingInteractions[0];
   const latestConfirmedInteractionAt = winningInteraction?.occurredAt;
 
-  // 10. NETWORK SIGNAL EVALUATION
-  if (relationshipClass === "network_signal") {
-    // Network signal without confirmed two-way interaction
-    if (!winningInteraction) {
-      const reasonCodes: QualificationReasonCode[] =
-        evidenceSummary.publicContext > 0
-          ? ["PUBLIC_CONTEXT_ONLY", "NETWORK_SIGNAL_ONLY", "NO_DIRECT_INTERACTION"]
-          : ["NETWORK_SIGNAL_ONLY", "NO_DIRECT_INTERACTION"];
+  // 10. UNCONNECTED / UNOBSERVABLE EVALUATION (if no observable winning interaction)
+  if (!winningInteraction) {
+    let latestDate: string | undefined;
+    let latestMs: number | undefined;
 
-      return {
-        relationshipId: relationship.id,
-        relationshipClass: "network_signal",
-        status: "confirmation_required",
-        recency: "unknown",
-        latestRelevantInteractionAt: undefined,
-        evidenceSummary,
-        reasonCodes,
-        explanation:
-          "Network signal or public co-occurrence without confirmed direct interaction evidence requires manual confirmation before introduction use.",
-      };
+    for (const ev of evidenceList) {
+      const dt = ev.interaction?.occurredAt || ev.observedAt;
+      if (dt) {
+        const ms = parseDateMs(dt);
+        if (ms !== null && ms <= refMs) {
+          if (latestMs === undefined || ms > latestMs) {
+            latestMs = ms;
+            latestDate = dt;
+          }
+        }
+      }
     }
 
-    // Confirmed two-way interaction exists on network signal edge
+    const recency = latestDate ? computeRecency(latestDate, referenceDate, policy) : "unknown";
+
+    const reasonCodes: QualificationReasonCode[] = [];
+    if (hasUnobservablePrivateEvidence) {
+      reasonCodes.push("PRIVATE_EVIDENCE_NOT_OBSERVABLE");
+    }
+    if (hasUserAssertedThirdParty) {
+      reasonCodes.push("USER_ASSERTED_THIRD_PARTY_RELATIONSHIP");
+    }
+    if (hasPublicEvidence || evidenceSummary.publicContext > 0) {
+      reasonCodes.push("PUBLIC_PROXIMITY_ONLY", "PUBLIC_CONTEXT_ONLY");
+    }
+    if (relationshipClass === "network_signal") {
+      reasonCodes.push("NETWORK_SIGNAL_ONLY");
+    }
+
+    if (recency === "stale") {
+      reasonCodes.push("STALE_INTERACTION");
+    } else if (recency === "aging") {
+      reasonCodes.push("AGING_INTERACTION");
+    }
+
+    reasonCodes.push("NO_DIRECT_INTERACTION", "THIRD_PARTY_CONFIRMATION_REQUIRED");
+
+    // Deduplicate reason codes
+    const uniqueReasonCodes = Array.from(new Set(reasonCodes));
+
+    let exp = "Relationship relies on public corroboration, user assertion, or unobservable private evidence and requires manual confirmation before introduction use.";
+    if (hasUnobservablePrivateEvidence) {
+      exp = "Arcstone cannot observe private interactions between third parties where no connected campaign founder is a direct endpoint. This relationship requires confirmation.";
+    } else if (hasUserAssertedThirdParty) {
+      exp = "Relationship is based on founder assertion about third parties without direct founder participation. Confirmation is required.";
+    } else if (hasPublicEvidence) {
+      exp = "Public sources show shared co-investment or board context, but Arcstone has no observable private interaction data. Confirmation is required.";
+    }
+
+    return {
+      relationshipId: relationship.id,
+      relationshipClass,
+      status: "confirmation_required",
+      recency,
+      latestRelevantInteractionAt: latestDate,
+      evidenceSummary,
+      reasonCodes: uniqueReasonCodes,
+      explanation: exp,
+    };
+  }
+
+  // 11. NETWORK SIGNAL RELATIONSHIPS WITH CONFIRMED INTERACTION
+  if (relationshipClass === "network_signal") {
     const recency = computeRecency(latestConfirmedInteractionAt, referenceDate, policy);
 
     if (recency === "recent") {

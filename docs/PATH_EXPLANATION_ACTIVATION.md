@@ -31,3 +31,4 @@ This layer transforms raw pipeline data, scores, and relationship evidence into 
 - **Weakest Link**: Identifies the bottleneck step (`bottleneckRelationshipId` or confirmation-required step) and provides recommended verification.
 - **Activation Plan**: Generates deterministic action steps (`direct_relationship_activation`, `request_intro_from_intermediary`, `verify_then_request_intro`, `multi_hop_activation`, `relationship_discovery_required`).
 - **Alternatives Considered**: Documents alternative retained routes and rejected routes to the primary target.
+

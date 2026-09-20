@@ -1,2 +1,2 @@
-evidenceId,relationshipId,type,description,observedAt,sourceName,sourceUrl,interactionOccurredAt,interactionReciprocity,interactionStatus
-ev-synthetic-1,rel-synthetic-1,linkedin,Synthetic connection evidence,2026-09-01T00:00:00.000Z,LinkedIn,https://linkedin.example.com,,,,
+evidenceId,relationshipId,type,description,observedAt,sourceName,sourceUrl,interactionOccurredAt,interactionReciprocity,interactionStatus,accessClass,sourceSystem,sourcePrincipalPersonId,authorizedByPersonId
+ev-synthetic-1,rel-synthetic-1,linkedin,Synthetic connection evidence,2026-09-01T00:00:00.000Z,LinkedIn,https://linkedin.example.com,,,,public,linkedin,,

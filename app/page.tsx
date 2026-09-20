@@ -361,33 +361,80 @@ export default function HomePage() {
                         )}
                       </div>
 
-                      {/* Section E: Connection Evidence */}
+                      {/* Section E: Connection Evidence & Observability */}
                       {hasWarmRoute && prefRoute.steps.length > 0 && (
-                        <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 space-y-3">
+                        <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 space-y-4">
                           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
-                            Section E — Connection Evidence
+                            Section E — Connection Evidence & Observability
                           </span>
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                             {prefRoute.steps.map((st, i) => (
-                              <div key={i} className="bg-slate-900/80 border border-slate-800 rounded-lg p-3.5 space-y-2">
+                              <div key={i} className="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-3">
                                 <div className="flex items-center justify-between text-xs font-bold text-white">
                                   <span>Hop {st.fromPersonName} → {st.toPersonName}</span>
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
-                                    st.qualificationStatus === "eligible"
-                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                      : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                                  }`}>
-                                    {st.qualificationStatus} ({st.qualificationRecency})
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                                      st.evidenceAccessClass === "first_party_private"
+                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                        : st.evidenceAccessClass === "user_asserted"
+                                        ? "bg-purple-500/10 text-purple-300 border border-purple-500/20"
+                                        : "bg-slate-800 text-slate-300 border border-slate-700"
+                                    }`}>
+                                      {st.evidenceAccessClass === "first_party_private"
+                                        ? "YOUR CONNECTED DATA"
+                                        : st.evidenceAccessClass === "user_asserted"
+                                        ? "YOUR ASSERTION"
+                                        : "PUBLIC SOURCE"}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                                      st.qualificationStatus === "eligible"
+                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                        : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                    }`}>
+                                      {st.qualificationStatus} ({st.qualificationRecency})
+                                    </span>
+                                  </div>
                                 </div>
+
                                 <p className="text-xs text-slate-300">
                                   {st.whyThisConnectionExists}
                                 </p>
+
+                                {/* What Arcstone Knows & Does Not Know */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                                  {st.whatArcstoneKnows && st.whatArcstoneKnows.length > 0 && (
+                                    <div className="bg-slate-950/80 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
+                                        ✓ What Arcstone Observes
+                                      </span>
+                                      <ul className="space-y-1 text-[11px] text-slate-300">
+                                        {st.whatArcstoneKnows.map((k, ki) => (
+                                          <li key={ki}>• {k}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                  {st.whatArcstoneDoesNotKnow && st.whatArcstoneDoesNotKnow.length > 0 && (
+                                    <div className="bg-slate-950/80 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        🔒 What Arcstone Does Not Know
+                                      </span>
+                                      <ul className="space-y-1 text-[11px] text-slate-400">
+                                        {st.whatArcstoneDoesNotKnow.map((dk, dki) => (
+                                          <li key={dki}>• {dk}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+
                                 {st.confidenceLimitation && (
                                   <p className="text-[11px] text-amber-400/90 italic">
                                     Limitation: {st.confidenceLimitation}
                                   </p>
                                 )}
+
                                 {st.evidenceItems.length > 0 && (
                                   <details className="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
                                     <summary className="cursor-pointer font-medium hover:text-slate-200">
@@ -395,8 +442,12 @@ export default function HomePage() {
                                     </summary>
                                     <ul className="mt-2 space-y-1 font-mono text-[10px] pl-2">
                                       {st.evidenceItems.map((ev, ei) => (
-                                        <li key={ei} className="text-slate-300">
-                                          • [{ev.evidenceType}] {ev.description}
+                                        <li key={ei} className="text-slate-300 flex items-center gap-2">
+                                          <span className="text-emerald-400">•</span>
+                                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[9px] uppercase font-sans">
+                                            {ev.originLabel || ev.accessClass}
+                                          </span>
+                                          <span>[{ev.evidenceType}] {ev.description}</span>
                                         </li>
                                       ))}
                                     </ul>

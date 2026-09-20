@@ -30,14 +30,13 @@ describe("Deterministic Relationship Qualification Engine", () => {
     expect(result.reasonCodes).toContain("RECENT_DIRECT_INTERACTION");
   });
 
-  it("2: Advisor Marcus ↔ Sarah after direct 2026 interaction evidence qualifies as eligible", () => {
+  it("2: Advisor Marcus ↔ Sarah with public co-investment evidence qualifies as confirmation_required", () => {
     const rel = getFixtureRel("rel-marcus-sarah");
     const ev = getFixtureEvidence(rel.evidenceIds);
     const result = qualifyRelationship(rel, ev, REFERENCE_DATE);
 
-    expect(result.status).toBe("eligible");
-    expect(result.recency).toBe("recent");
-    expect(result.reasonCodes).toContain("RECENT_DIRECT_INTERACTION");
+    expect(result.status).toBe("confirmation_required");
+    expect(result.reasonCodes).toContain("PUBLIC_PROXIMITY_ONLY");
   });
 
   it("3: Recent LinkedIn-only Founder ↔ David qualifies as confirmation_required", () => {
@@ -590,6 +589,12 @@ describe("Deterministic Relationship Qualification Engine", () => {
         relationshipId: testRel.id,
         type: "email_history",
         description: "Recent confirmed email coordination",
+        provenance: {
+          accessClass: "first_party_private",
+          sourceSystem: "gmail",
+          sourcePrincipalPersonId: "person-a",
+          authorizedByPersonId: "person-a",
+        },
         observedAt: "2026-09-10",
         interaction: {
           occurredAt: "2026-09-08",
@@ -599,7 +604,7 @@ describe("Deterministic Relationship Qualification Engine", () => {
       },
     ];
 
-    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE);
+    const result = qualifyRelationship(testRel, ev, REFERENCE_DATE, undefined, ["person-a"]);
 
     expect(result.status).toBe("eligible");
     expect(result.recency).toBe("recent");

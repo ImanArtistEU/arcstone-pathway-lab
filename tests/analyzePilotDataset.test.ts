@@ -39,12 +39,12 @@ describe("analyzePilotDataset", () => {
     const horizon = report.targetReports.find((t) => t.targetInvestorId === "target-horizon");
     expect(horizon).toBeDefined();
     expect(horizon!.scoring.scoredPaths).toHaveLength(1);
-    expect(horizon!.scoring.scoredPaths[0].overallPriorityIndex).toBe(98);
+    expect(horizon!.scoring.scoredPaths[0].overallPriorityIndex).toBe(73);
     expect(horizon!.selection.primaryTargetPersonId).toBe("person-vc-sarah");
 
     const sarahEval = horizon!.selection.evaluations.find((e) => e.personId === "person-vc-sarah");
     expect(sarahEval).toBeDefined();
-    expect(sarahEval!.overallTargetPriorityIndex).toBe(99);
+    expect(sarahEval!.overallTargetPriorityIndex).toBe(92);
   });
 
   it("31. confirms genuine Aurora no-path emits NO_KNOWN_PATH", () => {

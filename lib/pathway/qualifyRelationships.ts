@@ -32,8 +32,16 @@ export function qualifyRelationships(
     evidenceByRelationship.set(ev.relationshipId, list);
   }
 
+  const campaignFounderPersonIds = new Set<string>();
+  for (const campaign of dataset.campaigns || []) {
+    for (const fId of campaign.founderPersonIds || []) {
+      campaignFounderPersonIds.add(fId);
+    }
+  }
+  const founderIdsList = Array.from(campaignFounderPersonIds);
+
   return dataset.relationships.map((rel) => {
     const evidenceList = evidenceByRelationship.get(rel.id) || [];
-    return qualifyRelationship(rel, evidenceList, referenceDate, policy);
+    return qualifyRelationship(rel, evidenceList, referenceDate, policy, founderIdsList);
   });
 }

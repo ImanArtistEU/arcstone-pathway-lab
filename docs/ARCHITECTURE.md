@@ -115,10 +115,15 @@ $$\mathbf{MISSING\ STARTUP\ RECORD} \neq \mathbf{ORGANIZATION\ FALLBACK}$$
 35. **ROUTE RECOMMENDATION SCOPE**: Route selection ONLY considers retained scored paths (`scoringResult.scoredPaths`) where `path.targetPersonId === primaryTargetPersonId`.
 36. **TIED ROUTES ≠ ARBITRARY WINNER**: If multiple top routes share the highest score for the primary target, disposition is `ambiguous_top_routes` and `recommendedPathId` is `undefined`. No arbitrary tie-breaking is permitted.
 37. **WHY THIS ROUTE MUST BE COMPARATIVE**: Why-preferred statements compare the top route against alternative retained scored routes across credibility, freshness, confirmation, and efficiency.
+38. **EVIDENCE EXISTENCE ≠ ARCSTONE OBSERVABILITY**: Evidence existing in external history does not imply Arcstone has access or authorization to observe it.
+39. **PRIVATE COMMUNICATION ≠ ACCESSIBLE EVIDENCE**: Private email/calendar records are ONLY observable when a connected campaign founder is a direct endpoint.
+40. **PUBLIC PROXIMITY ≠ CONFIRMED INTERPERSONAL RELATIONSHIP**: Public co-investment, board, or news listings prove structural context, but CANNOT produce confirmed direct two-way interaction.
+41. **USER ASSERTION ≠ VERIFIED INTERACTION**: User-reported evidence records founder assertions without raw system log verification.
+42. **CONNECTED FOUNDER DATA ≠ THIRD-PARTY INBOX ACCESS**: Founder inbox authorization NEVER grants observability into private communications between third parties.
 
 ## Current status
 
-Batch 8 — Path Explanation & Activation Plan implemented.
+Batch 8.1 — Evidence Observability & Provenance Hardening implemented.
 
 ## Graph Semantics & Path Traversal
 

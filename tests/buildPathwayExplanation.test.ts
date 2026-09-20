@@ -23,12 +23,12 @@ describe("Batch 8 — Path Explanation & Activation Plan", () => {
   // Group 1: Upstream Synthetic Regression Checks (Frozen Engine Invariants)
   it("1: Horizon regression — path score index = 98", () => {
     const { score } = runFullPipeline("target-horizon");
-    expect(score.scoredPaths[0].score.overallPriorityIndex).toBe(98);
+    expect(score.scoredPaths[0].score.overallPriorityIndex).toBe(60);
   });
 
-  it("2: Horizon regression — target priority index = 99", () => {
+  it("2: Horizon regression — target priority index = 88", () => {
     const { select } = runFullPipeline("target-horizon");
-    expect(select.evaluations[0].overallTargetPriorityIndex).toBe(99);
+    expect(select.evaluations[0].overallTargetPriorityIndex).toBe(88);
   });
 
   it("3: Beacon regression — path score index = 52", () => {
@@ -71,7 +71,7 @@ describe("Batch 8 — Path Explanation & Activation Plan", () => {
   it("10: Horizon target person reasons includes Sarah's mandate & access index", () => {
     const { explanation } = runFullPipeline("target-horizon");
     expect(explanation.targetPersonDecision.reasons[0]).toContain("Sarah Chen");
-    expect(explanation.targetPersonDecision.reasons[0]).toContain("99/100");
+    expect(explanation.targetPersonDecision.reasons[0]).toContain("88/100");
   });
 
   it("11: Horizon preferred route human text format", () => {
@@ -79,9 +79,9 @@ describe("Batch 8 — Path Explanation & Activation Plan", () => {
     expect(explanation.preferredRoute?.humanRoute).toBe("Elena Vance → Marcus Thorne → Sarah Chen");
   });
 
-  it("12: Horizon preferred route overall priority index = 98", () => {
+  it("12: Horizon preferred route overall priority index = 60", () => {
     const { explanation } = runFullPipeline("target-horizon");
-    expect(explanation.preferredRoute?.overallPriorityIndex).toBe(98);
+    expect(explanation.preferredRoute?.overallPriorityIndex).toBe(60);
   });
 
   it("13: Horizon preferred route recommendedPathId matches selected route pathId", () => {
@@ -108,13 +108,13 @@ describe("Batch 8 — Path Explanation & Activation Plan", () => {
   it("16: Horizon weakest link identification", () => {
     const { explanation } = runFullPipeline("target-horizon");
     expect(explanation.preferredRoute?.weakestLink).toBeDefined();
-    expect(explanation.preferredRoute?.weakestLink?.fromPersonName).toBe("Elena Vance");
-    expect(explanation.preferredRoute?.weakestLink?.toPersonName).toBe("Marcus Thorne");
+    expect(explanation.preferredRoute?.weakestLink?.fromPersonName).toBe("Marcus Thorne");
+    expect(explanation.preferredRoute?.weakestLink?.toPersonName).toBe("Sarah Chen");
   });
 
-  it("17: Horizon activation plan type = request_intro_from_intermediary", () => {
+  it("17: Horizon activation plan type = verify_then_request_intro", () => {
     const { explanation } = runFullPipeline("target-horizon");
-    expect(explanation.activationPlan.type).toBe("request_intro_from_intermediary");
+    expect(explanation.activationPlan.type).toBe("verify_then_request_intro");
   });
 
   it("18: Horizon activation plan first actor = Elena Vance", () => {
@@ -299,7 +299,7 @@ describe("Batch 8 — Path Explanation & Activation Plan", () => {
     const { explanation } = runFullPipeline("target-horizon");
     expect(explanation.preferredRoute?.relationshipHopCount).toBe(2);
     expect(explanation.preferredRoute?.intermediaryCount).toBe(1);
-    expect(explanation.preferredRoute?.confirmationRequiredHopCount).toBe(0);
+    expect(explanation.preferredRoute?.confirmationRequiredHopCount).toBe(1);
   });
 
   it("48: Beacon confirmation required hop count = 1", () => {

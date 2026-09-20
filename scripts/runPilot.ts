@@ -187,15 +187,22 @@ export function generateMarkdownReport(report: PilotAnalysisReport): string {
     if (exp.preferredRoute && exp.preferredRoute.steps.length > 0) {
       for (const step of exp.preferredRoute.steps) {
         lines.push(`- **Hop ${step.fromPersonName} → ${step.toPersonName}** (\`${step.relationshipType}\`)`);
+        lines.push(`  - Provenance: \`${step.evidenceAccessClass || "public"}\` | Origin: \`${step.evidenceAccessClass === "first_party_private" ? "YOUR CONNECTED DATA" : step.evidenceAccessClass === "user_asserted" ? "YOUR ASSERTION" : "PUBLIC SOURCE"}\``);
         lines.push(`  - Status: \`${step.qualificationStatus}\` | Recency: \`${step.qualificationRecency}\``);
         lines.push(`  - Connection Rationale: ${step.whyThisConnectionExists}`);
+        if (step.whatArcstoneKnows && step.whatArcstoneKnows.length > 0) {
+          lines.push(`  - What Arcstone Observes: ${step.whatArcstoneKnows.join("; ")}`);
+        }
+        if (step.whatArcstoneDoesNotKnow && step.whatArcstoneDoesNotKnow.length > 0) {
+          lines.push(`  - What Arcstone Does Not Know: ${step.whatArcstoneDoesNotKnow.join("; ")}`);
+        }
         if (step.confidenceLimitation) {
           lines.push(`  - Limitation: *${step.confidenceLimitation}*`);
         }
         if (step.evidenceItems.length > 0) {
           lines.push("  - Evidence Items:");
           for (const ev of step.evidenceItems) {
-            lines.push(`    - [\`${ev.evidenceType}\`] ${ev.description}`);
+            lines.push(`    - [\`${ev.originLabel || ev.accessClass || ev.evidenceType}\`] ${ev.description}`);
           }
         }
       }

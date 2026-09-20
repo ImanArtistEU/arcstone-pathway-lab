@@ -27,6 +27,12 @@ export const oneWayOutboundEvidence: RelationshipEvidence = {
   relationshipId: "rel-test-outbound-isolated",
   type: "email_history",
   description: "Isolated regression fixture: Founder sent cold pitch email with no reply received",
+  provenance: {
+    accessClass: "first_party_private",
+    sourceSystem: "gmail",
+    sourcePrincipalPersonId: "person-founder-elena",
+    authorizedByPersonId: "person-founder-elena",
+  },
   observedAt: "2026-09-15",
   interaction: {
     occurredAt: "2026-09-14",

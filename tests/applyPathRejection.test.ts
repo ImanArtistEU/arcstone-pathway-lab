@@ -35,8 +35,8 @@ describe("Deterministic Path Rejection & Viability Filter (Batch 4)", () => {
     );
     const rejRes = applyPathRejection(genRes);
 
-    expect(rejRes.retainedPaths[0].status).toBe("eligible");
-    expect(rejRes.evaluations[0].originalPathStatus).toBe("eligible");
+    expect(rejRes.retainedPaths[0].status).toBe("candidate");
+    expect(rejRes.evaluations[0].originalPathStatus).toBe("candidate");
   });
 
   it("3: Beacon retained", () => {
@@ -231,6 +231,12 @@ describe("Deterministic Path Rejection & Viability Filter (Batch 4)", () => {
       relationshipId: "rel-invalid-date-edge",
       type: "meeting_history",
       description: "Invalid date record",
+      provenance: {
+        accessClass: "first_party_private",
+        sourceSystem: "google_calendar",
+        sourcePrincipalPersonId: "person-founder-elena",
+        authorizedByPersonId: "person-founder-elena",
+      },
       observedAt: "2026-09-01",
       interaction: {
         occurredAt: "not-a-date",
@@ -272,6 +278,12 @@ describe("Deterministic Path Rejection & Viability Filter (Batch 4)", () => {
       relationshipId: "rel-future-date-edge",
       type: "meeting_history",
       description: "Future meeting record",
+      provenance: {
+        accessClass: "first_party_private",
+        sourceSystem: "google_calendar",
+        sourcePrincipalPersonId: "person-founder-elena",
+        authorizedByPersonId: "person-founder-elena",
+      },
       observedAt: "2026-09-01",
       interaction: {
         occurredAt: "2027-01-01",

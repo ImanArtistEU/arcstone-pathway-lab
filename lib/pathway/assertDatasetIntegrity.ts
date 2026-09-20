@@ -207,6 +207,74 @@ export function assertDatasetIntegrity(
         );
       }
     }
+
+    // Validate provenance schema and referential integrity (Requirement 21)
+    if (!ev.provenance) {
+      errors.push(`Evidence "${ev.id}" is missing required provenance metadata.`);
+    } else {
+      const validAccessClasses = [
+        "first_party_private",
+        "user_asserted",
+        "public",
+        "consented_third_party_private",
+      ];
+      if (!validAccessClasses.includes(ev.provenance.accessClass)) {
+        errors.push(
+          `Evidence "${ev.id}" has invalid accessClass "${ev.provenance.accessClass}".`
+        );
+      }
+
+      const validSourceSystems = [
+        "gmail",
+        "google_calendar",
+        "crm",
+        "manual",
+        "linkedin",
+        "company_website",
+        "portfolio_page",
+        "press",
+        "public_web",
+        "other",
+      ];
+      if (!validSourceSystems.includes(ev.provenance.sourceSystem)) {
+        errors.push(
+          `Evidence "${ev.id}" has invalid sourceSystem "${ev.provenance.sourceSystem}".`
+        );
+      }
+
+      if (
+        ev.provenance.accessClass === "first_party_private" ||
+        ev.provenance.accessClass === "consented_third_party_private"
+      ) {
+        if (!ev.provenance.sourcePrincipalPersonId) {
+          errors.push(
+            `Evidence "${ev.id}" with accessClass "${ev.provenance.accessClass}" requires sourcePrincipalPersonId.`
+          );
+        } else if (!personIds.has(ev.provenance.sourcePrincipalPersonId)) {
+          errors.push(
+            `Evidence "${ev.id}" specifies nonexistent sourcePrincipalPersonId "${ev.provenance.sourcePrincipalPersonId}" which does not exist in people.`
+          );
+        }
+
+        if (!ev.provenance.authorizedByPersonId) {
+          errors.push(
+            `Evidence "${ev.id}" with accessClass "${ev.provenance.accessClass}" requires authorizedByPersonId.`
+          );
+        } else if (!personIds.has(ev.provenance.authorizedByPersonId)) {
+          errors.push(
+            `Evidence "${ev.id}" specifies nonexistent authorizedByPersonId "${ev.provenance.authorizedByPersonId}" which does not exist in people.`
+          );
+        }
+      }
+
+      if (ev.provenance.accessClass === "user_asserted") {
+        if (ev.provenance.authorizedByPersonId && !personIds.has(ev.provenance.authorizedByPersonId)) {
+          errors.push(
+            `Evidence "${ev.id}" specifies authorizedByPersonId "${ev.provenance.authorizedByPersonId}" which does not exist in people.`
+          );
+        }
+      }
+    }
   }
 
   // 3. Campaigns startup and founder references
