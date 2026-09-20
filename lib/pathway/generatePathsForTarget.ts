@@ -283,7 +283,7 @@ export function generatePathsForTarget(
   for (const cId of targetPersonIds) {
     const targetOrgId = targetInvestor.investorOrganizationId;
 
-    if (!isCurrentTargetPersonAffiliationVerified(dataset, cId, targetOrgId)) {
+    if (!isCurrentTargetPersonAffiliationVerified(dataset, cId, targetOrgId, referenceDate)) {
       return createErrorResult(
         targetInvestorId,
         [

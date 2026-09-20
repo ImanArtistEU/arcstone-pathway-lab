@@ -5,6 +5,7 @@ import { generatePathsForTarget } from "../lib/pathway/generatePathsForTarget";
 import { applyPathRejection } from "../lib/pathway/applyPathRejection";
 import { scoreRetainedPaths } from "../lib/pathway/scoreRetainedPaths";
 import { selectTargetPerson } from "../lib/pathway/selectTargetPerson";
+import { isCurrentTargetPersonAffiliationVerified } from "../lib/pathway/targetPersonAffiliation";
 import {
   PathwayDataset,
   PathScoringResult,
@@ -995,5 +996,408 @@ describe("Batch 6 — Deterministic Target Person Selection Engine", () => {
     const res2 = selectTargetPerson(pathwayDemoDataset, "target-horizon", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
 
     expect(JSON.stringify(res1)).toBe(JSON.stringify(res2));
+  });
+
+  // Batch 6.1 — Contract Hardening Tests (46 - 73)
+  it("46: Centralized affiliation: currentOrganizationIds verifies current affiliation", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    const isAff = isCurrentTargetPersonAffiliationVerified(ds, "person-vc-sarah", "org-horizon-vc", "2026-09-18");
+    expect(isAff).toBe(true);
+  });
+
+  it("47: Centralized affiliation: works_at with no endedAt and startedAt <= referenceDate verifies current affiliation", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.people.find(p => p.id === "person-vc-sarah")!.currentOrganizationIds = [];
+    ds.relationships = ds.relationships.filter(r => !(r.from.id === "person-vc-sarah" && r.to.id === "org-horizon-vc" && r.type === "works_at"));
+    ds.relationships.push({
+      id: "rel-test-works",
+      from: { type: "person", id: "person-vc-sarah" },
+      to: { type: "organization", id: "org-horizon-vc" },
+      type: "works_at",
+      direction: "directed",
+      evidenceIds: [],
+      startedAt: "2020-01-01",
+    });
+    const isAff = isCurrentTargetPersonAffiliationVerified(ds, "person-vc-sarah", "org-horizon-vc", "2026-09-18");
+    expect(isAff).toBe(true);
+  });
+
+  it("48: Centralized affiliation: works_at with endedAt BEFORE referenceDate fails affiliation verification", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.people.find(p => p.id === "person-vc-sarah")!.currentOrganizationIds = [];
+    ds.relationships = ds.relationships.filter(r => !(r.from.id === "person-vc-sarah" && r.to.id === "org-horizon-vc" && r.type === "works_at"));
+    ds.relationships.push({
+      id: "rel-test-works-ended",
+      from: { type: "person", id: "person-vc-sarah" },
+      to: { type: "organization", id: "org-horizon-vc" },
+      type: "works_at",
+      direction: "directed",
+      evidenceIds: [],
+      startedAt: "2020-01-01",
+      endedAt: "2026-09-17",
+    });
+    const isAff = isCurrentTargetPersonAffiliationVerified(ds, "person-vc-sarah", "org-horizon-vc", "2026-09-18");
+    expect(isAff).toBe(false);
+  });
+
+  it("49: Centralized affiliation: works_at with endedAt EQUAL referenceDate fails affiliation verification", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.people.find(p => p.id === "person-vc-sarah")!.currentOrganizationIds = [];
+    ds.relationships = ds.relationships.filter(r => !(r.from.id === "person-vc-sarah" && r.to.id === "org-horizon-vc" && r.type === "works_at"));
+    ds.relationships.push({
+      id: "rel-test-works-ended-eq",
+      from: { type: "person", id: "person-vc-sarah" },
+      to: { type: "organization", id: "org-horizon-vc" },
+      type: "works_at",
+      direction: "directed",
+      evidenceIds: [],
+      startedAt: "2020-01-01",
+      endedAt: "2026-09-18",
+    });
+    const isAff = isCurrentTargetPersonAffiliationVerified(ds, "person-vc-sarah", "org-horizon-vc", "2026-09-18");
+    expect(isAff).toBe(false);
+  });
+
+  it("50: Centralized affiliation: works_at with endedAt AFTER referenceDate verifies current affiliation", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.people.find(p => p.id === "person-vc-sarah")!.currentOrganizationIds = [];
+    ds.relationships = ds.relationships.filter(r => !(r.from.id === "person-vc-sarah" && r.to.id === "org-horizon-vc" && r.type === "works_at"));
+    ds.relationships.push({
+      id: "rel-test-works-ended-future",
+      from: { type: "person", id: "person-vc-sarah" },
+      to: { type: "organization", id: "org-horizon-vc" },
+      type: "works_at",
+      direction: "directed",
+      evidenceIds: [],
+      startedAt: "2020-01-01",
+      endedAt: "2026-09-19",
+    });
+    const isAff = isCurrentTargetPersonAffiliationVerified(ds, "person-vc-sarah", "org-horizon-vc", "2026-09-18");
+    expect(isAff).toBe(true);
+  });
+
+  it("51: Centralized affiliation: works_at with startedAt AFTER referenceDate fails affiliation verification", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.people.find(p => p.id === "person-vc-sarah")!.currentOrganizationIds = [];
+    ds.relationships = ds.relationships.filter(r => !(r.from.id === "person-vc-sarah" && r.to.id === "org-horizon-vc" && r.type === "works_at"));
+    ds.relationships.push({
+      id: "rel-test-works-future-start",
+      from: { type: "person", id: "person-vc-sarah" },
+      to: { type: "organization", id: "org-horizon-vc" },
+      type: "works_at",
+      direction: "directed",
+      evidenceIds: [],
+      startedAt: "2026-09-19",
+    });
+    const isAff = isCurrentTargetPersonAffiliationVerified(ds, "person-vc-sarah", "org-horizon-vc", "2026-09-18");
+    expect(isAff).toBe(false);
+  });
+
+  it("52: Centralized affiliation: works_at with malformed startedAt date string fails affiliation verification", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.people.find(p => p.id === "person-vc-sarah")!.currentOrganizationIds = [];
+    ds.relationships = ds.relationships.filter(r => !(r.from.id === "person-vc-sarah" && r.to.id === "org-horizon-vc" && r.type === "works_at"));
+    ds.relationships.push({
+      id: "rel-test-works-bad-start",
+      from: { type: "person", id: "person-vc-sarah" },
+      to: { type: "organization", id: "org-horizon-vc" },
+      type: "works_at",
+      direction: "directed",
+      evidenceIds: [],
+      startedAt: "not-a-date",
+    });
+    const isAff = isCurrentTargetPersonAffiliationVerified(ds, "person-vc-sarah", "org-horizon-vc", "2026-09-18");
+    expect(isAff).toBe(false);
+  });
+
+  it("53: Centralized affiliation: works_at with malformed endedAt date string fails affiliation verification", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.people.find(p => p.id === "person-vc-sarah")!.currentOrganizationIds = [];
+    ds.relationships = ds.relationships.filter(r => !(r.from.id === "person-vc-sarah" && r.to.id === "org-horizon-vc" && r.type === "works_at"));
+    ds.relationships.push({
+      id: "rel-test-works-bad-end",
+      from: { type: "person", id: "person-vc-sarah" },
+      to: { type: "organization", id: "org-horizon-vc" },
+      type: "works_at",
+      direction: "directed",
+      evidenceIds: [],
+      startedAt: "2020-01-01",
+      endedAt: "invalid-date",
+    });
+    const isAff = isCurrentTargetPersonAffiliationVerified(ds, "person-vc-sarah", "org-horizon-vc", "2026-09-18");
+    expect(isAff).toBe(false);
+  });
+
+  it("54: Centralized affiliation: worked_at relationship type does NOT verify affiliation", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.people.find(p => p.id === "person-vc-sarah")!.currentOrganizationIds = [];
+    ds.relationships = ds.relationships.filter(r => !(r.from.id === "person-vc-sarah" && r.to.id === "org-horizon-vc" && r.type === "works_at"));
+    ds.relationships.push({
+      id: "rel-test-worked",
+      from: { type: "person", id: "person-vc-sarah" },
+      to: { type: "organization", id: "org-horizon-vc" },
+      type: "worked_at" as any,
+      direction: "directed",
+      evidenceIds: [],
+    });
+    const isAff = isCurrentTargetPersonAffiliationVerified(ds, "person-vc-sarah", "org-horizon-vc", "2026-09-18");
+    expect(isAff).toBe(false);
+  });
+
+  it("55: Temporal affiliation in Path Generation: generatePathsForTarget rejects candidate with expired works_at edge", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.people.find(p => p.id === "person-vc-sarah")!.currentOrganizationIds = [];
+    const rel = ds.relationships.find(r => r.id === "rel-sarah-horizon")!;
+    rel.endedAt = "2026-09-01";
+
+    const gen = generatePathsForTarget(ds, "target-horizon", REFERENCE_DATE);
+    expect(gen.executionStatus).toBe("error");
+    expect(gen.errors[0].code).toBe("TARGET_PERSON_AFFILIATION_UNVERIFIED");
+  });
+
+  it("56: Zero-access explanation: candidate with unknown role/stage/sector/geo contains actual statuses and NO 'strong'", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-summit", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+    const profiles: TargetPersonProfile[] = [
+      {
+        targetInvestorId: "target-summit",
+        personId: "person-vc-clara",
+        roleTitle: "Unknown Role",
+        investmentRole: "unknown",
+        stageFocus: [],
+        sectorFocus: [],
+        geographyFocus: [],
+        observedAt: "2026-09-18T00:00:00.000Z",
+      },
+    ];
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-summit", profiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("success");
+    const exp = res.evaluations[0].explanation;
+    expect(exp).toContain("Investment role: Unknown Role (unknown). Stage: unknown. Sector: unknown. Geography: unknown.");
+    expect(exp).toContain("No retained scored path is currently available.");
+    expect(exp).not.toContain("strong");
+    expect(exp).not.toContain("weak");
+  });
+
+  it("57: Zero-access explanation: candidate with no_match stage/sector produces factual explanation displaying Stage: no_match", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-summit", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+    const profiles: TargetPersonProfile[] = [
+      {
+        targetInvestorId: "target-summit",
+        personId: "person-vc-clara",
+        roleTitle: "Partner",
+        investmentRole: "lead_investor",
+        stageFocus: ["Growth"], // Startup is Seed
+        sectorFocus: ["Biotech"], // Startup is Enterprise Software
+        geographyFocus: ["global"],
+        observedAt: "2026-09-18T00:00:00.000Z",
+      },
+    ];
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-summit", profiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("success");
+    const exp = res.evaluations[0].explanation;
+    expect(exp).toContain("Stage: no_match. Sector: no_match. Geography: match.");
+    expect(exp).toContain("No retained scored path is currently available.");
+    expect(exp).not.toContain("strong");
+  });
+
+  it("58: Zero-access explanation truthfulness: Clara Oswald explanation displays actual match statuses and warning suffix", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-summit", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-summit", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("success");
+    const exp = res.evaluations[0].explanation;
+    expect(exp).toBe("Target priority index 70/100. Investment role: Partner (lead investor). Stage: match. Sector: match. Geography: match. No retained scored path is currently available. This is an uncalibrated heuristic, not a probability or outreach recommendation.");
+  });
+
+  it("59: Missing startup sector yields sectorFitStatus = unknown and score = 50", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    delete (ds.startups[0] as any).sector;
+
+    const gen = generatePathsForTarget(ds, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const res = selectTargetPerson(ds, "target-horizon", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("success");
+    expect(res.evaluations[0].sectorFitStatus).toBe("unknown");
+    expect(res.evaluations[0].sectorFitScore).toBe(50);
+  });
+
+  it("60: Missing startup geography yields geographyFitStatus = unknown and score = 50", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    delete (ds.startups[0] as any).geography;
+
+    const gen = generatePathsForTarget(ds, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const res = selectTargetPerson(ds, "target-horizon", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("success");
+    expect(res.evaluations[0].geographyFitStatus).toBe("unknown");
+    expect(res.evaluations[0].geographyFitScore).toBe(50);
+  });
+
+  it("61: Missing startup stage and campaign round yields stageFitStatus = unknown and score = 50", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    delete (ds.campaigns[0] as any).round;
+    delete (ds.startups[0] as any).stage;
+
+    const gen = generatePathsForTarget(ds, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const res = selectTargetPerson(ds, "target-horizon", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("success");
+    expect(res.evaluations[0].stageFitStatus).toBe("unknown");
+    expect(res.evaluations[0].stageFitScore).toBe(50);
+  });
+
+  it("62: Campaign round fallback: blank campaign round falls back to startup.stage", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.campaigns[0].round = "   ";
+    ds.startups[0].stage = "Seed";
+
+    const gen = generatePathsForTarget(ds, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const res = selectTargetPerson(ds, "target-horizon", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("success");
+    expect(res.evaluations[0].stageFitStatus).toBe("match");
+    expect(res.evaluations[0].stageFitScore).toBe(100);
+  });
+
+  it("63: Startup record missing from dataset.startups returns executionStatus = error (no organization fallback)", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    const startupObj = ds.startups.shift()!;
+    ds.organizations.push({
+      id: startupObj.id,
+      name: startupObj.name,
+      type: "startup",
+    } as any);
+
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const res = selectTargetPerson(ds, "target-horizon", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("not found in dataset.startups");
+  });
+
+  it("64: Profile Malformation - stageFocus element as number returns execution error", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const badProfiles: TargetPersonProfile[] = JSON.parse(JSON.stringify(targetPersonDemoProfiles));
+    (badProfiles[0].stageFocus as any) = [123];
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-horizon", badProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("stageFocus entries must be non-empty strings");
+  });
+
+  it("65: Profile Malformation - sectorFocus element as null returns execution error", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const badProfiles: TargetPersonProfile[] = JSON.parse(JSON.stringify(targetPersonDemoProfiles));
+    (badProfiles[0].sectorFocus as any) = [null];
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-horizon", badProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("sectorFocus entries must be non-empty strings");
+  });
+
+  it("66: Profile Malformation - geographyFocus element as object returns execution error", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const badProfiles: TargetPersonProfile[] = JSON.parse(JSON.stringify(targetPersonDemoProfiles));
+    (badProfiles[0].geographyFocus as any) = [{}];
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-horizon", badProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("geographyFocus entries must be non-empty strings");
+  });
+
+  it("67: Profile Malformation - focus array contains blank whitespace string returns execution error", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const badProfiles: TargetPersonProfile[] = JSON.parse(JSON.stringify(targetPersonDemoProfiles));
+    badProfiles[0].stageFocus = ["   "];
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-horizon", badProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("stageFocus entries must be non-empty strings");
+  });
+
+  it("68: Profile Malformation - sourceName as number returns execution error", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const badProfiles: TargetPersonProfile[] = JSON.parse(JSON.stringify(targetPersonDemoProfiles));
+    (badProfiles[0].sourceName as any) = 12345;
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-horizon", badProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("sourceName must be a string");
+  });
+
+  it("69: Profile Malformation - sourceUrl as object returns execution error", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const badProfiles: TargetPersonProfile[] = JSON.parse(JSON.stringify(targetPersonDemoProfiles));
+    (badProfiles[0].sourceUrl as any) = { url: "http://test" };
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-horizon", badProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("sourceUrl must be a string");
+  });
+
+  it("70: Candidate Person ID Integrity - duplicate candidate ID returns execution error", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.targetInvestors[0].candidatePersonIds = ["person-vc-sarah", "person-vc-sarah"];
+
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const res = selectTargetPerson(ds, "target-horizon", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("contains duplicate person ID");
+  });
+
+  it("71: Candidate Person ID Integrity - empty string candidate ID returns execution error", () => {
+    const ds: PathwayDataset = JSON.parse(JSON.stringify(pathwayDemoDataset));
+    ds.targetInvestors[0].candidatePersonIds = ["   "];
+
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+
+    const res = selectTargetPerson(ds, "target-horizon", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("candidatePersonIds contains invalid non-empty string entries");
+  });
+
+  it("72: Scored Path Cross-Target Validation - mismatched targetInvestorId returns execution error", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+    scoreRes.scoredPaths[0].path.targetInvestorId = "target-beacon";
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-horizon", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("does not match requested targetInvestorId");
+  });
+
+  it("73: Scored Path Cross-Target Validation - mismatched targetPersonId returns execution error", () => {
+    const gen = generatePathsForTarget(pathwayDemoDataset, "target-horizon", REFERENCE_DATE);
+    const scoreRes = scoreRetainedPaths(applyPathRejection(gen));
+    scoreRes.scoredPaths[0].path.targetPersonId = "person-vc-unknown-alien";
+
+    const res = selectTargetPerson(pathwayDemoDataset, "target-horizon", targetPersonDemoProfiles, scoreRes, REFERENCE_DATE);
+    expect(res.executionStatus).toBe("error");
+    expect(res.errors[0]).toContain("is not in candidatePersonIds");
   });
 });

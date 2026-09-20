@@ -1,6 +1,5 @@
 import {
   PathwayDataset,
-  Startup,
   PathScoringResult,
   TargetPersonProfile,
   TargetPersonEvaluation,
@@ -16,17 +15,31 @@ import {
 } from "./targetPersonSelectionPolicy";
 
 function normalizeString(val: string): string {
+  if (typeof val !== "string") {
+    return "";
+  }
   return val.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function evaluateDimensionFit(
-  startupValue: string,
+  startupValue: string | undefined | null,
   profileFocus: string[],
   broadTerms: string[],
   matchScore: number,
   unknownScore: number,
   noMatchScore: number
 ): { status: TargetPersonFitStatus; score: number } {
+  // If startup context is missing/empty/whitespace -> status = unknown
+  if (
+    startupValue === undefined ||
+    startupValue === null ||
+    typeof startupValue !== "string" ||
+    startupValue.trim() === ""
+  ) {
+    return { status: "unknown", score: unknownScore };
+  }
+
+  // If profile focus is missing/empty -> status = unknown
   if (!Array.isArray(profileFocus) || profileFocus.length === 0) {
     return { status: "unknown", score: unknownScore };
   }
@@ -80,6 +93,11 @@ function createErrorResult(
  * 4. SELECTION ≠ OUTREACH RECOMMENDATION (Chooses WHO, not HOW to reach)
  * 5. CANDIDATE DISCOVERY ≠ TARGET PERSON SELECTION (Candidate pool is provided upstream)
  * 6. MISSING PERSON CONTEXT ≠ PERSON IRRELEVANCE (Missing profile yields insufficient_context)
+ * 7. MISSING STARTUP CONTEXT ≠ NO MATCH (Missing startup dimensions yield unknown fit)
+ * 8. MALFORMED PROFILE ≠ VALID PROFILE (Strict focus array and metadata validation)
+ * 9. EXPLANATION MUST MATCH ACTUAL FIT (Explanations reflect actual computed dimension statuses)
+ * 10. CURRENT AFFILIATION MUST ACTUALLY BE CURRENT (Temporal works_at checks against referenceDate)
+ * 11. MISSING STARTUP RECORD ≠ ORGANIZATION FALLBACK (Requires actual Startup record from dataset.startups)
  */
 export function selectTargetPerson(
   dataset: PathwayDataset,
@@ -118,7 +136,7 @@ export function selectTargetPerson(
     return createErrorResult(targetInvestorId, [], policyErrors);
   }
 
-  // 3. Resolve Target Investor
+  // 3. Resolve Target Investor & Candidate Person IDs
   const targetInvestor = dataset.targetInvestors.find(
     (t) => t.id === targetInvestorId
   );
@@ -128,14 +146,34 @@ export function selectTargetPerson(
     ]);
   }
 
-  const candidatePersonIds = [...(targetInvestor.candidatePersonIds || [])];
-  if (candidatePersonIds.length === 0) {
+  if (
+    !Array.isArray(targetInvestor.candidatePersonIds) ||
+    targetInvestor.candidatePersonIds.length === 0
+  ) {
     return createErrorResult(targetInvestorId, [], [
-      `TargetInvestor "${targetInvestorId}" contains zero candidatePersonIds.`,
+      `TargetInvestor "${targetInvestorId}" candidatePersonIds must be a non-empty array.`,
     ]);
   }
 
-  // 4. Resolve Campaign & Startup
+  const candidatePersonIds: string[] = [];
+  const seenCandidateIds = new Set<string>();
+
+  for (const id of targetInvestor.candidatePersonIds) {
+    if (typeof id !== "string" || id.trim() === "") {
+      return createErrorResult(targetInvestorId, [], [
+        `TargetInvestor "${targetInvestorId}" candidatePersonIds contains invalid non-empty string entries.`,
+      ]);
+    }
+    if (seenCandidateIds.has(id)) {
+      return createErrorResult(targetInvestorId, [], [
+        `TargetInvestor "${targetInvestorId}" candidatePersonIds contains duplicate person ID "${id}".`,
+      ]);
+    }
+    seenCandidateIds.add(id);
+    candidatePersonIds.push(id);
+  }
+
+  // 4. Resolve Campaign & Startup Record (STRICTLY dataset.startups, NO organization fallback)
   const campaign = dataset.campaigns.find(
     (c) => c.id === targetInvestor.campaignId
   );
@@ -145,16 +183,14 @@ export function selectTargetPerson(
     ]);
   }
 
-  const startup =
-    dataset.startups?.find((s) => s.id === campaign.startupId) ||
-    dataset.organizations.find((o) => o.id === campaign.startupId);
+  const startup = dataset.startups?.find((s) => s.id === campaign.startupId);
   if (!startup) {
     return createErrorResult(targetInvestorId, candidatePersonIds, [
-      `Startup organization "${campaign.startupId}" referenced by Campaign "${campaign.id}" not found in dataset.`,
+      `Startup record "${campaign.startupId}" referenced by Campaign "${campaign.id}" not found in dataset.startups.`,
     ]);
   }
 
-  // 5. Validate PathScoringResult matching & execution status
+  // 5. Validate PathScoringResult matching & execution status & candidate path integrity
   if (scoringResult.targetInvestorId !== targetInvestorId) {
     return createErrorResult(targetInvestorId, candidatePersonIds, [
       `PathScoringResult targetInvestorId "${scoringResult.targetInvestorId}" does not match requested targetInvestorId "${targetInvestorId}".`,
@@ -181,7 +217,20 @@ export function selectTargetPerson(
     };
   }
 
-  // 6. Validate Candidate Existence and Current Affiliation
+  for (const sp of scoringResult.scoredPaths) {
+    if (sp.path.targetInvestorId !== targetInvestorId) {
+      return createErrorResult(targetInvestorId, candidatePersonIds, [
+        `PathScoringResult contains a scored path with targetInvestorId "${sp.path.targetInvestorId}" which does not match requested targetInvestorId "${targetInvestorId}".`,
+      ]);
+    }
+    if (!candidatePersonIds.includes(sp.path.targetPersonId)) {
+      return createErrorResult(targetInvestorId, candidatePersonIds, [
+        `PathScoringResult contains a scored path for targetPersonId "${sp.path.targetPersonId}" which is not in candidatePersonIds for targetInvestor "${targetInvestorId}".`,
+      ]);
+    }
+  }
+
+  // 6. Validate Candidate Existence and Current Affiliation (Temporal referenceDate check)
   for (const cId of candidatePersonIds) {
     const person = dataset.people.find((p) => p.id === cId);
     if (!person) {
@@ -194,7 +243,8 @@ export function selectTargetPerson(
       !isCurrentTargetPersonAffiliationVerified(
         dataset,
         cId,
-        targetInvestor.investorOrganizationId
+        targetInvestor.investorOrganizationId,
+        referenceDate
       )
     ) {
       return createErrorResult(targetInvestorId, candidatePersonIds, [
@@ -252,13 +302,53 @@ export function selectTargetPerson(
       prof.personId.trim() === "" ||
       typeof prof.roleTitle !== "string" ||
       prof.roleTitle.trim() === "" ||
-      !validInvestmentRoles.includes(prof.investmentRole) ||
-      !Array.isArray(prof.stageFocus) ||
-      !Array.isArray(prof.sectorFocus) ||
-      !Array.isArray(prof.geographyFocus)
+      !validInvestmentRoles.includes(prof.investmentRole)
     ) {
       return createErrorResult(targetInvestorId, candidatePersonIds, [
         `Invalid profile fields for person "${cId}" in target investor "${targetInvestorId}".`,
+      ]);
+    }
+
+    // Focus array element validations
+    const focusArrays = [
+      { arr: prof.stageFocus, name: "stageFocus" },
+      { arr: prof.sectorFocus, name: "sectorFocus" },
+      { arr: prof.geographyFocus, name: "geographyFocus" },
+    ];
+
+    for (const { arr, name } of focusArrays) {
+      if (!Array.isArray(arr)) {
+        return createErrorResult(targetInvestorId, candidatePersonIds, [
+          `Invalid target person profile "${cId}": ${name} must be an array.`,
+        ]);
+      }
+      for (const entry of arr) {
+        if (typeof entry !== "string" || entry.trim() === "") {
+          return createErrorResult(targetInvestorId, candidatePersonIds, [
+            `Invalid target person profile "${cId}": ${name} entries must be non-empty strings.`,
+          ]);
+        }
+      }
+    }
+
+    // Metadata string type validation if provided
+    if (
+      prof.sourceName !== undefined &&
+      prof.sourceName !== null &&
+      typeof prof.sourceName !== "string"
+    ) {
+      return createErrorResult(targetInvestorId, candidatePersonIds, [
+        `Invalid target person profile "${cId}": sourceName must be a string.`,
+      ]);
+    }
+
+    if (
+      prof.sourceUrl !== undefined &&
+      prof.sourceUrl !== null &&
+      typeof prof.sourceUrl !== "string"
+    ) {
+      return createErrorResult(targetInvestorId, candidatePersonIds, [
+        `Invalid target person profile "${cId}": sourceUrl must be a string.`,
       ]);
     }
 
@@ -301,10 +391,23 @@ export function selectTargetPerson(
     };
   }
 
-  // 9. Evaluate Candidates
-  const startupStage = campaign.round || ("stage" in startup ? (startup as Startup).stage : "") || "";
-  const startupSector = ("sector" in startup ? (startup as Startup).sector : "") || "";
-  const startupGeography = startup.geography || "";
+  // 9. Stage context: Campaign.round primary, startup.stage fallback
+  let startupStage = "";
+  if (typeof campaign.round === "string" && campaign.round.trim() !== "") {
+    startupStage = campaign.round;
+  } else if (typeof startup.stage === "string" && startup.stage.trim() !== "") {
+    startupStage = startup.stage;
+  }
+
+  const startupSector =
+    typeof startup.sector === "string" && startup.sector.trim() !== ""
+      ? startup.sector
+      : "";
+
+  const startupGeography =
+    typeof startup.geography === "string" && startup.geography.trim() !== ""
+      ? startup.geography
+      : "";
 
   const evaluations: TargetPersonEvaluation[] = [];
 
@@ -389,13 +492,15 @@ export function selectTargetPerson(
         )
       : 0;
 
+    const formattedRole = prof.investmentRole.replace("_", " ");
+
     let explanation: string;
     if (!selectable) {
       explanation = `Target priority index 0/100. Investment role is non-investment (${prof.roleTitle}), excluded from target person selection. This is an uncalibrated heuristic, not a probability or outreach recommendation.`;
     } else if (accessQualityIndex > 0) {
-      explanation = `Target priority index ${overallTargetPriorityIndex}/100. Investment role: ${prof.roleTitle} (${prof.investmentRole.replace("_", " ")}). Stage: ${stageFit.status}. Sector: ${sectorFit.status}. Geography: ${geoFit.status}. Highest available access index: ${accessQualityIndex}/100. This is an uncalibrated heuristic, not a probability or outreach recommendation.`;
+      explanation = `Target priority index ${overallTargetPriorityIndex}/100. Investment role: ${prof.roleTitle} (${formattedRole}). Stage: ${stageFit.status}. Sector: ${sectorFit.status}. Geography: ${geoFit.status}. Highest available access index: ${accessQualityIndex}/100. This is an uncalibrated heuristic, not a probability or outreach recommendation.`;
     } else {
-      explanation = `Target priority index ${overallTargetPriorityIndex}/100. Investment role and mandate fit are strong, but no retained scored path is currently available. This is an uncalibrated heuristic, not a probability or outreach recommendation.`;
+      explanation = `Target priority index ${overallTargetPriorityIndex}/100. Investment role: ${prof.roleTitle} (${formattedRole}). Stage: ${stageFit.status}. Sector: ${sectorFit.status}. Geography: ${geoFit.status}. No retained scored path is currently available. This is an uncalibrated heuristic, not a probability or outreach recommendation.`;
     }
 
     evaluations.push({

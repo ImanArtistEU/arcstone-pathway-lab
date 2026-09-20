@@ -66,6 +66,16 @@ $$\mathbf{CANDIDATE\ DISCOVERY} \neq \mathbf{TARGET\ PERSON\ SELECTION}$$
 
 $$\mathbf{MISSING\ PERSON\ CONTEXT} \neq \mathbf{PERSON\ IRRELEVANCE}$$
 
+$$\mathbf{MISSING\ STARTUP\ CONTEXT} \neq \mathbf{NO\ MATCH}$$
+
+$$\mathbf{MALFORMED\ PROFILE} \neq \mathbf{VALID\ PROFILE}$$
+
+$$\mathbf{EXPLANATION\ MUST\ MATCH\ ACTUAL\ FIT}$$
+
+$$\mathbf{CURRENT\ AFFILIATION\ MUST\ ACTUALLY\ BE\ CURRENT}$$
+
+$$\mathbf{MISSING\ STARTUP\ RECORD} \neq \mathbf{ORGANIZATION\ FALLBACK}$$
+
 1. **Network Visibility $\neq$ Introduction Credibility**: A weak tie or social graph connection may establish proximity, but Arcstone requires verifiable interaction or corroborated evidence before considering a relationship credible for a fundraising introduction.
 2. **Observation Time $\neq$ Interaction Time**: The time Arcstone observes or ingests an evidence artifact (`observedAt`) is strictly decoupled from the time the human interaction occurred (`interaction.occurredAt`).
 3. **Outreach $\neq$ Reciprocal Relationship**: One-way outbound outreach (e.g. unreplied email) does not constitute a reciprocal relationship and cannot qualify as introduction-eligible.
@@ -93,9 +103,15 @@ $$\mathbf{MISSING\ PERSON\ CONTEXT} \neq \mathbf{PERSON\ IRRELEVANCE}$$
 25. **Candidate Discovery $\neq$ Target Person Selection**: Candidates are supplied explicitly in `TargetInvestor.candidatePersonIds`. Selection does not discover external people.
 26. **Missing Person Context $\neq$ Person Irrelevance**: Missing target person profiles yield `insufficient_context` rather than silent candidate exclusion.
 
+27. **Missing Startup Context $\neq$ No Match**: Missing startup stage, sector, or geography context yields `unknown` (score 50), not `no_match`.
+28. **Malformed Profile $\neq$ Valid Profile**: Profile focus arrays must contain non-empty strings and metadata strings must be valid types; malformed profiles fail closed.
+29. **Explanation Must Match Actual Fit**: Candidate explanations are derived strictly from computed role, stage, sector, geography, and access indices without qualitative claims.
+30. **Current Affiliation Must Actually Be Current**: `works_at` affiliations are temporally evaluated against `referenceDate` (`startedAt <= referenceDate` and `endedAt > referenceDate`); stale or future affiliations do not verify.
+31. **Missing Startup Record $\neq$ Organization Fallback**: Target Person Selection requires an actual `Startup` record from `dataset.startups`; `Organization` fallback is forbidden.
+
 ## Current status
 
-Batch 6 — Deterministic Target Person Selection operational.
+Batch 6.1 — Target Person Selection contract hardened.
 
 ## Graph Semantics & Path Traversal
 
@@ -130,7 +146,7 @@ Path Rejection [IMPLEMENTED]
       ↓
 Path Scoring [IMPLEMENTED]
       ↓
-Target Person Selection [PLANNED]
+Target Person Selection [IMPLEMENTED]
       ↓
 Explanation / Recommended Action [PLANNED]
       ↓
