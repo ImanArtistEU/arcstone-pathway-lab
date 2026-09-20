@@ -1,0 +1,3 @@
+id,personAId,personBId,type,evidenceIds,observedAt,occurredAt
+sig-marcus-sarah-1,person-advisor-marcus,person-vc-sarah,co_invested_same_deal,ev-horizon-pub-1,2026-09-01,2026-03-15
+sig-marcus-sarah-2,person-advisor-marcus,person-vc-sarah,shared_board,ev-horizon-pub-2,2026-09-01,2026-06-01

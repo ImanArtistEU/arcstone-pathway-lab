@@ -117,13 +117,14 @@ $$\mathbf{MISSING\ STARTUP\ RECORD} \neq \mathbf{ORGANIZATION\ FALLBACK}$$
 37. **WHY THIS ROUTE MUST BE COMPARATIVE**: Why-preferred statements compare the top route against alternative retained scored routes across credibility, freshness, confirmation, and efficiency.
 38. **EVIDENCE EXISTENCE ≠ ARCSTONE OBSERVABILITY**: Evidence existing in external history does not imply Arcstone has access or authorization to observe it.
 39. **PRIVATE COMMUNICATION ≠ ACCESSIBLE EVIDENCE**: Private email/calendar records are ONLY observable when a connected campaign founder is a direct endpoint.
-40. **PUBLIC PROXIMITY ≠ CONFIRMED INTERPERSONAL RELATIONSHIP**: Public co-investment, board, or news listings prove structural context, but CANNOT produce confirmed direct two-way interaction.
-41. **USER ASSERTION ≠ VERIFIED INTERACTION**: User-reported evidence records founder assertions without raw system log verification.
-42. **CONNECTED FOUNDER DATA ≠ THIRD-PARTY INBOX ACCESS**: Founder inbox authorization NEVER grants observability into private communications between third parties.
+43. **PUBLIC PROXIMITY ≠ CONFIRMED INTERPERSONAL RELATIONSHIP**: Public co-investment, board, or news listings prove structural context, but CANNOT produce confirmed direct two-way interaction.
+44. **BRIDGE HYPOTHESIS ≠ CONFIRMED INTRODUCTION ROUTE**: Unverified bridge hypotheses are candidate network leads requiring human verification ("ASK ABOUT THE TARGET"), not confirmed routes.
+45. **NO KNOWN ROUTE ≠ COLD OUTREACH REQUIRED**: Absence of a direct warm route in founder inbox data does not imply cold outreach is required; latent bridges or platform adjacencies should be explored.
+46. **DECISION TARGET ≠ EASIEST ENTRY POINT**: The primary decision target (e.g. Lead Partner) remains the target person even if a lower-level or alternative contact provides an easier entry point.
 
 ## Current status
 
-Batch 8.1 — Evidence Observability & Provenance Hardening implemented.
+Batch 9 — Latent Network Bridge Intelligence implemented.
 
 ## Graph Semantics & Path Traversal
 

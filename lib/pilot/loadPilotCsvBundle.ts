@@ -22,6 +22,10 @@ import {
   TargetPersonInvestmentRole,
   EvidenceAccessClass,
   EvidenceSourceSystem,
+  ProximitySignal,
+  ProximitySignalType,
+  BridgeVerification,
+  BridgeVerificationStatus,
 } from "@/types/pathway";
 import { assertDatasetIntegrity } from "@/lib/pathway/assertDatasetIntegrity";
 
@@ -1037,6 +1041,47 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
     return { status: "error", errors, warnings };
   }
 
+  // Parse optional proximity-signals.csv
+  const proximitySignalsPath = path.join(resolvedDir, "proximity-signals.csv");
+  const proximitySignals: ProximitySignal[] = [];
+  if (fs.existsSync(proximitySignalsPath)) {
+    const rawContent = fs.readFileSync(proximitySignalsPath, "utf-8");
+    const records = parse(rawContent, { columns: true, skip_empty_lines: true, trim: true }) as Record<string, string>[];
+    for (const r of records) {
+      if (r.id && r.personAId && r.personBId && r.type) {
+        proximitySignals.push({
+          id: r.id,
+          personAId: r.personAId,
+          personBId: r.personBId,
+          type: r.type as ProximitySignalType,
+          evidenceIds: r.evidenceIds ? r.evidenceIds.split("|") : [],
+          observedAt: r.observedAt || undefined,
+          occurredAt: r.occurredAt || undefined,
+        });
+      }
+    }
+  }
+
+  // Parse optional bridge-verifications.csv
+  const bridgeVerificationsPath = path.join(resolvedDir, "bridge-verifications.csv");
+  const bridgeVerifications: BridgeVerification[] = [];
+  if (fs.existsSync(bridgeVerificationsPath)) {
+    const rawContent = fs.readFileSync(bridgeVerificationsPath, "utf-8");
+    const records = parse(rawContent, { columns: true, skip_empty_lines: true, trim: true }) as Record<string, string>[];
+    for (const r of records) {
+      if (r.bridgeHypothesisId && r.status && r.reportedByPersonId && r.reportedAt) {
+        bridgeVerifications.push({
+          id: r.id || undefined,
+          bridgeHypothesisId: r.bridgeHypothesisId,
+          status: r.status as BridgeVerificationStatus,
+          reportedByPersonId: r.reportedByPersonId,
+          reportedAt: r.reportedAt,
+          notes: r.notes || undefined,
+        });
+      }
+    }
+  }
+
   // 10. Construct PathwayDataset and validate integrity
   const dataset: PathwayDataset = {
     startups,
@@ -1046,6 +1091,8 @@ export function loadPilotCsvBundle(dirPath: string): PilotBundleLoadResult {
     targetInvestors,
     relationships,
     relationshipEvidence,
+    proximitySignals,
+    bridgeVerifications,
   };
 
   const integrityResult = assertDatasetIntegrity(dataset);

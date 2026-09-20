@@ -262,7 +262,38 @@ export function generateMarkdownReport(report: PilotAnalysisReport): string {
     }
     lines.push("");
 
-    // 9. Diagnostic Flags
+    // 9. Latent Network Bridge Intelligence (Part 32)
+    if (t.fundAccessStrategy) {
+      const fas = t.fundAccessStrategy;
+      lines.push("### Latent Network Bridge Intelligence & Fund Access Strategy");
+      lines.push(`- **Fund Access Status:** \`${fas.accessStatus}\``);
+      lines.push(`- **Decision Target Person:** \`${fas.decisionTargetPersonId}\``);
+      if (fas.reachableEntryPointPersonId) {
+        lines.push(`- **Reachable Entry Point Person:** \`${fas.reachableEntryPointPersonId}\``);
+      }
+      if (fas.bestBridgeHypothesis) {
+        const b = fas.bestBridgeHypothesis;
+        lines.push(`- **Best Person to Ask:** \`${b.anchorPersonId}\` (Bridge Relevance Index: **${b.bridgeRelevance.overallBridgeRelevanceIndex}/100** - Uncalibrated relevance index)`);
+        lines.push("- **What Arcstone Knows:**");
+        for (const k of b.whatWeKnow) {
+          lines.push(`  - ${k}`);
+        }
+        lines.push("- **What Arcstone Does Not Know:**");
+        for (const dk of b.whatWeDoNotKnow) {
+          lines.push(`  - ${dk}`);
+        }
+        lines.push(`- **Recommended Action:** **${b.verificationRequired ? `ASK ABOUT TARGET (\`ASK ${b.anchorPersonId} ABOUT ${b.targetPersonId}\`)` : `REQUEST INTRODUCTION (\`REQUEST INTRODUCTION FROM ${b.anchorPersonId} TO ${b.targetPersonId}\`)`}**`);
+      }
+      if (fas.alternativeBridgeHypotheses.length > 0) {
+        lines.push("- **Alternative Bridges Worth Asking:**");
+        for (const alt of fas.alternativeBridgeHypotheses) {
+          lines.push(`  - \`${alt.anchorPersonId}\` (Relevance Index: ${alt.bridgeRelevance.overallBridgeRelevanceIndex}/100)`);
+        }
+      }
+      lines.push("");
+    }
+
+    // 10. Diagnostic Flags
     lines.push("### Diagnostic Flags");
     if (t.diagnosticFlags.length > 0) {
       lines.push(`- **Flags:** ${t.diagnosticFlags.map((f) => `\`${f}\``).join(", ")}`);

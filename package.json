@@ -9,7 +9,7 @@
     "lint": "next lint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "pilot:analyze": "tsx scripts/runPilot.ts"
+    "pilot:analyze": "tsx scripts/runPilot.ts --input data/fixtures/pilot-csv-sample --reference-date 2026-09-18"
   },
   "dependencies": {
     "csv-parse": "^7.0.2",

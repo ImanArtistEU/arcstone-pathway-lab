@@ -69,3 +69,4 @@ Every step in a pathway explanation provides clear transparency:
 - **`whatArcstoneKnows`**: Explicit list of facts Arcstone can legitimately observe (e.g., "Arcstone observes public co-investment press releases and board observer listings").
 - **`whatArcstoneDoesNotKnow`**: Explicit boundary declarations (e.g., "Arcstone cannot observe private emails or meetings between third parties where no connected founder is a party").
 - **`activationPlan`**: When a route contains an unobservable or confirmation-required third-party hop, the activation plan mandates a `verify_then_request_intro` strategy before asking for an introduction.
+

@@ -207,7 +207,7 @@ describe("Deterministic Path Generation & Traversal Engine (Batch 3.1 Hardened)"
       REFERENCE_DATE
     );
     expect(res.executionStatus).toBe("success");
-    expect(res.coldOutreachRequired).toBe(true);
+    expect(res.coldOutreachRequired).toBe(false);
   });
 
   // Policy & Graph Invariant Tests
@@ -331,7 +331,7 @@ describe("Deterministic Path Generation & Traversal Engine (Batch 3.1 Hardened)"
     expect(horizonRes.executionStatus).toBe("success");
     expect(horizonRes.paths.length).toBe(0);
     expect(horizonRes.disposition).toBe("no_known_path");
-    expect(horizonRes.coldOutreachRequired).toBe(true);
+    expect(horizonRes.coldOutreachRequired).toBe(false);
 
     const beaconRes = generatePathsForTarget(
       pathwayDemoDataset,

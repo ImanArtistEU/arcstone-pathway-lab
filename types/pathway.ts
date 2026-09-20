@@ -398,6 +398,145 @@ export interface PathwayDataset {
   relationshipEvidence: RelationshipEvidence[];
   campaigns: FundraisingCampaign[];
   targetInvestors: TargetInvestor[];
+  proximitySignals?: ProximitySignal[];
+  bridgeVerifications?: BridgeVerification[];
+}
+
+// ============================================================================
+// LATENT NETWORK BRIDGE INTELLIGENCE (Batch 9)
+// ============================================================================
+
+export type ProximitySignalType =
+  | "co_invested_same_deal"
+  | "shared_board"
+  | "portfolio_relationship"
+  | "worked_at_same_organization"
+  | "accelerator_overlap"
+  | "university_overlap"
+  | "event_overlap"
+  | "linkedin_connection"
+  | "public_collaboration"
+  | "public_mention"
+  | "other";
+
+export interface ProximitySignal {
+  id: string;
+  personAId: string;
+  personBId: string;
+  type: ProximitySignalType;
+  evidenceIds: string[];
+  observedAt?: string;
+  occurredAt?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export type AnchorRelationshipStatus =
+  | "verified"
+  | "asserted"
+  | "stale"
+  | "unverified"
+  | "ineligible";
+
+export type AskabilityStatus = "unknown" | "comfortable" | "not_comfortable";
+
+export interface FounderNetworkAnchor {
+  founderPersonId: string;
+  anchorPersonId: string;
+  relationshipId: string;
+  relationshipStatus: AnchorRelationshipStatus;
+  relationshipQualityIndex: number;
+  recency: RecencyBucket;
+  evidenceBasis: string[];
+  askabilityStatus: AskabilityStatus;
+}
+
+export type BridgeHypothesisStatus =
+  | "potential_bridge"
+  | "worth_asking"
+  | "confirmed_route"
+  | "refuted"
+  | "not_actionable"
+  | "insufficient_evidence";
+
+export interface BridgeRelevanceScore {
+  overallBridgeRelevanceIndex: number;
+  anchorRelationshipQuality: number;
+  targetProximityStrength: number;
+  proximityFreshness: number;
+  signalCorroboration: number;
+  calibrationStatus: "uncalibrated_heuristic";
+  isProbability: false;
+  explanation: string;
+}
+
+export interface BridgeHypothesis {
+  id: string;
+  targetInvestorId: string;
+  targetPersonId: string;
+  founderPersonId: string;
+  anchorPersonId: string;
+  anchorRelationshipId: string;
+  proximitySignalIds: string[];
+  status: BridgeHypothesisStatus;
+  bridgeRelevance: BridgeRelevanceScore;
+  explanation: string;
+  whatWeKnow: string[];
+  whatWeDoNotKnow: string[];
+  verificationRequired: boolean;
+}
+
+export type BridgeVerificationStatus =
+  | "unknown"
+  | "founder_believes_valid"
+  | "anchor_confirms_knows_target"
+  | "anchor_confirms_can_introduce"
+  | "anchor_knows_target_but_will_not_introduce"
+  | "anchor_relationship_too_weak"
+  | "does_not_know_target"
+  | "not_comfortable_asking_anchor";
+
+export interface BridgeVerification {
+  id?: string;
+  bridgeHypothesisId: string;
+  status: BridgeVerificationStatus;
+  reportedByPersonId: string;
+  reportedAt: string;
+  notes?: string;
+}
+
+export type FundAccessStatus =
+  | "VERIFIED_DIRECT_RELATIONSHIP"
+  | "CONFIRMED_INTRO_ROUTE"
+  | "POTENTIAL_BRIDGE_FOUND"
+  | "PLATFORM_ADJACENCY_ONLY"
+  | "NO_CREDIBLE_BRIDGE_FOUND";
+
+export interface FundAccessStrategy {
+  targetInvestorId: string;
+  accessStatus: FundAccessStatus;
+  decisionTargetPersonId: string;
+  reachableEntryPointPersonId?: string;
+  bestBridgeHypothesis?: BridgeHypothesis;
+  alternativeBridgeHypotheses: BridgeHypothesis[];
+  explanation: string;
+}
+
+export type BridgeOutcomeType =
+  | "anchor_asked"
+  | "anchor_knows_target"
+  | "anchor_does_not_know_target"
+  | "anchor_not_comfortable"
+  | "intro_requested"
+  | "intro_declined"
+  | "intro_made"
+  | "meeting_booked";
+
+export interface BridgeOutcome {
+  id: string;
+  bridgeHypothesisId: string;
+  outcome: BridgeOutcomeType;
+  occurredAt: string;
+  notes?: string;
 }
 
 // ============================================================================

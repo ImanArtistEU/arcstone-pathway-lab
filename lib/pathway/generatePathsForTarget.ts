@@ -465,7 +465,8 @@ export function generatePathsForTarget(
     disposition = "no_known_path";
   }
 
-  const coldOutreachRequired = disposition === "no_known_path";
+  // Arcstone Batch 9 Invariant: NO KNOWN ROUTE != COLD OUTREACH REQUIRED
+  const coldOutreachRequired = false;
 
   return {
     executionStatus: "success",

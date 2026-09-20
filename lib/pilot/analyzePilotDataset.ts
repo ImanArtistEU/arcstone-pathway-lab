@@ -3,12 +3,16 @@ import {
   TargetPersonProfile,
   TargetPersonEvaluation,
   PathwayExplanation,
+  FundAccessStrategy,
 } from "@/types/pathway";
 import { generatePathsForTarget } from "@/lib/pathway/generatePathsForTarget";
 import { applyPathRejection } from "@/lib/pathway/applyPathRejection";
 import { scoreRetainedPaths } from "@/lib/pathway/scoreRetainedPaths";
 import { selectTargetPerson } from "@/lib/pathway/selectTargetPerson";
 import { buildPathwayExplanation } from "@/lib/pathway/buildPathwayExplanation";
+import { extractFounderNetworkAnchors } from "@/lib/pathway/extractFounderNetworkAnchors";
+import { discoverBridgeHypotheses } from "@/lib/pathway/discoverBridgeHypotheses";
+import { determineFundAccessStrategy } from "@/lib/pathway/determineFundAccessStrategy";
 
 export type PilotAnalysisStatus = "success" | "error";
 
@@ -66,6 +70,7 @@ export interface PilotTargetReport {
     evaluations: TargetPersonEvaluation[];
     errors: unknown[];
   };
+  fundAccessStrategy?: FundAccessStrategy;
   explanation: PathwayExplanation;
   diagnosticFlags: string[];
 }
@@ -398,6 +403,20 @@ export function analyzePilotDataset(
       referenceDate
     );
 
+    // Execute Batch 9 Latent Bridge Intelligence Discovery
+    const anchors = extractFounderNetworkAnchors(dataset, campaign, referenceDate);
+    const targetPersonId = selectResult.primaryTargetPersonId || targetInvestor.candidatePersonIds[0];
+    const bridgeHypotheses = targetPersonId
+      ? discoverBridgeHypotheses(dataset, campaign, targetInvestor, targetPersonId, anchors, referenceDate)
+      : [];
+    const fundAccessStrategy = determineFundAccessStrategy(
+      dataset,
+      campaign,
+      targetInvestor,
+      selectResult,
+      bridgeHypotheses
+    );
+
     targetReports.push({
       targetInvestorId: targetInvestor.id,
       investorOrganizationId: targetInvestor.investorOrganizationId,
@@ -434,6 +453,7 @@ export function analyzePilotDataset(
         evaluations: selectResult.evaluations || [],
         errors: selectResult.errors || [],
       },
+      fundAccessStrategy,
       explanation,
       diagnosticFlags: flags,
     });

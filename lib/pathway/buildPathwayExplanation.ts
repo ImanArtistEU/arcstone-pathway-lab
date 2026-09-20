@@ -117,7 +117,7 @@ function buildTargetPersonDecisionExplanation(
       : "geography fit is unknown because available context is incomplete";
 
   reasons.push(
-    `${primaryPersonName} is prioritized because she/he is ${roleText}, ${stageText}, ${sectorText}, and ${geoText}. Her/His mandate fit index is ${primaryEval.mandateFitIndex}/100 and access quality is ${primaryEval.accessQualityIndex}/100, producing an overall target priority index of ${primaryEval.overallTargetPriorityIndex}/100.`
+    `${primaryPersonName} is prioritized because this person is ${roleText}, ${stageText}, ${sectorText}, and ${geoText}. Mandate fit index is ${primaryEval.mandateFitIndex}/100 and access quality is ${primaryEval.accessQualityIndex}/100, producing an overall target priority index of ${primaryEval.overallTargetPriorityIndex}/100.`
   );
 
   // Candidate comparisons
